@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarePlan Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .status.pending {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .status.processing {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .status.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .status.failed {
+            background: #dc3545;
+            color: white;
+        }
+
+        .care-plan-content {
+            white-space: pre-wrap;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .orders-list {
+            margin-top: 30px;
+        }
+
+        .order-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 CarePlan Generator</h1>
+
+        <form id="orderForm">
+            <h3>Patient Information</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Name *</label>
+                    <input type="text" id="patientFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label>Last Name *</label>
+                    <input type="text" id="patientLastName" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>MRN (6 digits) *</label>
+                    <input type="text" id="patientMrn" maxlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label>Date of Birth *</label>
+                    <input type="date" id="patientDateOfBirth" required>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 30px;">Provider Information</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Provider Name *</label>
+                    <input type="text" id="providerName" required>
+                </div>
+                <div class="form-group">
+                    <label>NPI (10 digits) *</label>
+                    <input type="text" id="providerNpi" maxlength="10" required>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 30px;">Clinical Information</h3>
+            <div class="form-group">
+                <label>Medication Name *</label>
+                <input type="text" id="medicationName" required>
+            </div>
+
+            <div class="form-group">
+                <label>Primary Diagnosis (ICD-10)</label>
+                <input type="text" id="primaryDiagnosis">
+            </div>
+
+            <div class="form-group">
+                <label>Additional Diagnoses</label>
+                <textarea id="additionalDiagnosis"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Medication History</label>
+                <textarea id="medicationHistory"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Patient Records</label>
+                <textarea id="patientRecords"></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">Generate CarePlan</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px;">Generating care plan... This may take 10-30 seconds.</p>
+        </div>
+
+        <div class="result" id="result">
+            <h3>Order Created Successfully!</h3>
+            <p><strong>Order ID:</strong> <span id="orderId"></span></p>
+            <p><strong>Status:</strong> <span class="status" id="status"></span></p>
+            <div id="carePlanSection" style="display: none;">
+                <h4 style="margin-top: 15px;">Care Plan:</h4>
+                <div class="care-plan-content" id="carePlanContent"></div>
+            </div>
+        </div>
+
+        <div class="orders-list">
+            <h3>Recent Orders</h3>
+            <button onclick="loadOrders()" style="margin-bottom: 15px;">Refresh Orders</button>
+            <div id="ordersList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080/api/orders';
+
+        document.getElementById('orderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+
+            submitBtn.disabled = true;
+            loading.classList.add('show');
+            result.classList.remove('show');
+
+            const requestData = {
+                patientFirstName: document.getElementById('patientFirstName').value,
+                patientLastName: document.getElementById('patientLastName').value,
+                patientMrn: document.getElementById('patientMrn').value,
+                patientDateOfBirth: document.getElementById('patientDateOfBirth').value,
+                providerName: document.getElementById('providerName').value,
+                providerNpi: document.getElementById('providerNpi').value,
+                medicationName: document.getElementById('medicationName').value,
+                primaryDiagnosis: document.getElementById('primaryDiagnosis').value,
+                additionalDiagnosis: document.getElementById('additionalDiagnosis').value,
+                medicationHistory: document.getElementById('medicationHistory').value,
+                patientRecords: document.getElementById('patientRecords').value
+            };
+
+            try {
+                const response = await fetch(API_BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                document.getElementById('orderId').textContent = data.id;
+
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = data.status;
+                statusElement.className = 'status ' + data.status.toLowerCase();
+
+                if (data.status === 'COMPLETED' && data.carePlanContent) {
+                    document.getElementById('carePlanSection').style.display = 'block';
+                    document.getElementById('carePlanContent').textContent = data.carePlanContent;
+                } else {
+                    document.getElementById('carePlanSection').style.display = 'none';
+                }
+
+                result.classList.add('show');
+                loadOrders();
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        async function loadOrders() {
+            try {
+                const response = await fetch(API_BASE_URL);
+                const orders = await response.json();
+
+                const ordersListDiv = document.getElementById('ordersList');
+
+                if (orders.length === 0) {
+                    ordersListDiv.innerHTML = '<p>No orders yet.</p>';
+                    return;
+                }
+
+                ordersListDiv.innerHTML = orders.map(order => `
+                    <div class="order-item">
+                        <strong>Order #${order.id}</strong> - ${order.medicationName}
+                        <br>
+                        <span class="status ${order.status.toLowerCase()}">${order.status}</span>
+                        ${order.status === 'COMPLETED' && order.carePlanContent ?
+                            '<br><small>Care plan generated ✓</small>' : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading orders:', error);
+            }
+        }
+
+        // Load orders on page load
+        loadOrders();
+    </script>
+</body>
+</html>
+
