@@ -6,9 +6,12 @@ import com.page24.backend.entity.*;
 import com.page24.backend.repository.*;
 import com.page24.backend.service.LLMService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -111,6 +114,74 @@ public class OrderController {
         return ResponseEntity.ok(responses);
     }
 
+    // 搜索功能：根据患者名字或 MRN 搜索
+    @GetMapping("/search")
+    public ResponseEntity<List<OrderResponse>> searchOrders(
+            @RequestParam(required = false) String patientName,
+            @RequestParam(required = false) String mrn) {
+
+        List<Order> orders;
+
+        if (mrn != null && !mrn.isEmpty()) {
+            // 根据 MRN 搜索
+            Patient patient = patientRepository.findByMrn(mrn).orElse(null);
+            if (patient != null) {
+                orders = orderRepository.findByPatient(patient);
+            } else {
+                orders = List.of();
+            }
+        } else if (patientName != null && !patientName.isEmpty()) {
+            // 根据患者名字搜索（支持模糊搜索）
+            List<Patient> patients = patientRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+                    patientName, patientName);
+            orders = patients.stream()
+                    .flatMap(patient -> orderRepository.findByPatient(patient).stream())
+                    .collect(Collectors.toList());
+        } else {
+            // 如果没有提供搜索条件，返回所有订单
+            orders = orderRepository.findAll();
+        }
+
+        List<OrderResponse> responses = orders.stream()
+                .map(order -> {
+                    CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
+                    return toResponse(order, carePlan);
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(responses);
+    }
+
+    // 下载功能：下载 CarePlan 为文本文件
+    @GetMapping("/{id}/download")
+    public ResponseEntity<byte[]> downloadCarePlan(@PathVariable Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        CarePlan carePlan = carePlanRepository.findByOrderId(id)
+                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
+
+        if (carePlan.getStatus() != CarePlan.Status.COMPLETED) {
+            throw new RuntimeException("CarePlan is not completed yet");
+        }
+
+        // 构建文件内容
+        String content = buildDownloadContent(order, carePlan);
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+
+        // 设置文件名：CarePlan_PatientName_OrderId.txt
+        String filename = String.format("CarePlan_%s_%s_%d.txt",
+                order.getPatient().getFirstName(),
+                order.getPatient().getLastName(),
+                order.getId());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.TEXT_PLAIN)
+                .contentLength(bytes.length)
+                .body(bytes);
+    }
+
     private String buildPatientInfo(Patient patient, Order order) {
         return String.format("""
                 Name: %s %s
@@ -152,6 +223,58 @@ public class OrderController {
         }
 
         return response;
+    }
+
+    private String buildDownloadContent(Order order, CarePlan carePlan) {
+        Patient patient = order.getPatient();
+        Provider provider = order.getProvider();
+
+        return String.format("""
+                ================================================================================
+                                            CARE PLAN
+                ================================================================================
+                
+                PATIENT INFORMATION
+                --------------------------------------------------------------------------------
+                Name: %s %s
+                MRN: %s
+                Date of Birth: %s
+                
+                PROVIDER INFORMATION
+                --------------------------------------------------------------------------------
+                Provider: %s
+                NPI: %s
+                
+                ORDER INFORMATION
+                --------------------------------------------------------------------------------
+                Order ID: %d
+                Medication: %s
+                Primary Diagnosis: %s
+                Additional Diagnoses: %s
+                
+                CARE PLAN CONTENT
+                ================================================================================
+                %s
+                
+                ================================================================================
+                Generated on: %s
+                Status: %s
+                ================================================================================
+                """,
+                patient.getFirstName(),
+                patient.getLastName(),
+                patient.getMrn(),
+                patient.getDateOfBirth(),
+                provider.getName(),
+                provider.getNpi(),
+                order.getId(),
+                order.getMedicationName(),
+                order.getPrimaryDiagnosis(),
+                order.getAdditionalDiagnosis(),
+                carePlan.getContent(),
+                carePlan.getUpdatedAt(),
+                carePlan.getStatus()
+        );
     }
 }
 

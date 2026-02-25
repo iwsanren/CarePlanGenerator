@@ -257,8 +257,26 @@
         </div>
 
         <div class="orders-list">
-            <h3>Recent Orders</h3>
-            <button onclick="loadOrders()" style="margin-bottom: 15px;">Refresh Orders</button>
+            <h3>Search & Manage Orders</h3>
+
+            <!-- Search Section -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <div class="form-row">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>Search by Patient Name</label>
+                        <input type="text" id="searchName" placeholder="Enter first or last name">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>Search by MRN</label>
+                        <input type="text" id="searchMrn" placeholder="Enter MRN (6 digits)" maxlength="6">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="searchOrders()" style="margin-top: 0;">🔍 Search</button>
+                    <button onclick="loadOrders()" style="margin-top: 0; background: #6c757d;">📋 Show All</button>
+                </div>
+            </div>
+
             <div id="ordersList"></div>
         </div>
     </div>
@@ -330,26 +348,110 @@
             try {
                 const response = await fetch(API_BASE_URL);
                 const orders = await response.json();
+                displayOrders(orders);
+            } catch (error) {
+                console.error('Error loading orders:', error);
+            }
+        }
 
-                const ordersListDiv = document.getElementById('ordersList');
+        async function searchOrders() {
+            const searchName = document.getElementById('searchName').value.trim();
+            const searchMrn = document.getElementById('searchMrn').value.trim();
+
+            if (!searchName && !searchMrn) {
+                alert('Please enter a search term (Patient Name or MRN)');
+                return;
+            }
+
+            try {
+                let url = `${API_BASE_URL}/search?`;
+                if (searchMrn) {
+                    url += `mrn=${encodeURIComponent(searchMrn)}`;
+                } else if (searchName) {
+                    url += `patientName=${encodeURIComponent(searchName)}`;
+                }
+
+                const response = await fetch(url);
+                const orders = await response.json();
+                displayOrders(orders);
 
                 if (orders.length === 0) {
-                    ordersListDiv.innerHTML = '<p>No orders yet.</p>';
+                    alert('No orders found matching your search criteria.');
+                }
+            } catch (error) {
+                console.error('Error searching orders:', error);
+                alert('Error searching orders: ' + error.message);
+            }
+        }
+
+        function displayOrders(orders) {
+            const ordersListDiv = document.getElementById('ordersList');
+
+            if (orders.length === 0) {
+                ordersListDiv.innerHTML = '<p style="text-align: center; color: #999;">No orders found.</p>';
+                return;
+            }
+
+            ordersListDiv.innerHTML = orders.map(order => `
+                <div class="order-item">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <strong>Order #${order.id}</strong> - ${order.medicationName}
+                            <br>
+                            <span class="status ${order.status.toLowerCase()}">${order.status}</span>
+                            ${order.status === 'COMPLETED' && order.carePlanContent ?
+                                '<br><small style="color: #28a745;">✓ Care plan generated</small>' :
+                                order.status === 'PROCESSING' ?
+                                '<br><small style="color: #17a2b8;">⏳ Generating...</small>' :
+                                '<br><small style="color: #ffc107;">⏸ Pending</small>'}
+                        </div>
+                        <div>
+                            ${order.status === 'COMPLETED' ?
+                                `<button onclick="downloadCarePlan(${order.id})"
+                                    style="padding: 8px 15px; font-size: 14px; width: auto; margin-top: 0; background: #28a745;">
+                                    📥 Download
+                                </button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function downloadCarePlan(orderId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${orderId}/download`);
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    alert('Download failed: ' + error);
                     return;
                 }
 
-                ordersListDiv.innerHTML = orders.map(order => `
-                    <div class="order-item">
-                        <strong>Order #${order.id}</strong> - ${order.medicationName}
-                        <br>
-                        <span class="status ${order.status.toLowerCase()}">${order.status}</span>
-                        ${order.status === 'COMPLETED' && order.carePlanContent ?
-                            '<br><small>Care plan generated ✓</small>' : ''}
-                    </div>
-                `).join('');
+                // Get filename from Content-Disposition header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'CarePlan.txt';
+                if (contentDisposition) {
+                    const matches = /filename="([^"]+)"/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
 
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                alert('Care plan downloaded successfully!');
             } catch (error) {
-                console.error('Error loading orders:', error);
+                console.error('Error downloading care plan:', error);
+                alert('Error downloading care plan: ' + error.message);
             }
         }
 
