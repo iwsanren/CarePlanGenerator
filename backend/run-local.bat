@@ -1,38 +1,45 @@
 @echo off
 echo ========================================
-echo Starting CarePlan Generator (Local)
+echo Starting CarePlan Generator (Day 2-3)
 echo ========================================
 echo.
 
 REM Check if .env file exists
 if not exist .env (
     echo [ERROR] .env file not found!
-    echo Please copy .env.example to .env and add your API key.
     echo.
-    echo Run: copy .env.example .env
+    echo Please copy .env.example to .env and add your API key:
+    echo   copy .env.example .env
+    echo.
+    echo Then edit .env and add your OpenAI/Claude API key.
+    echo.
     pause
     exit /b 1
 )
 
-REM Start PostgreSQL with Docker
-echo Starting PostgreSQL database...
-docker run -d --name careplan-postgres -e POSTGRES_DB=careplan -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15-alpine
-
-REM Wait for database to be ready
-echo Waiting for database to start...
-timeout /t 5 /nobreak > nul
-
-REM Load environment variables from .env
-for /f "tokens=1,2 delims==" %%a in (.env) do (
-    if not "%%a"=="" if not "%%a:~0,1%"=="#" (
-        set %%a=%%b
-    )
+REM Check if Docker is running
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Docker is not running!
+    echo.
+    echo Please start Docker Desktop and try again.
+    echo.
+    pause
+    exit /b 1
 )
 
-REM Run Spring Boot application
-echo Starting Spring Boot application...
+echo Starting all services with Docker Compose...
 echo.
-mvnw.cmd spring-boot:run
+echo This will:
+echo   1. Start PostgreSQL database
+echo   2. Build and start Spring Boot application
+echo   3. Auto-import Mock Data (Day 3)
+echo.
 
-pause
+REM Start services
+docker-compose up --build
+
+REM This will keep running until you press Ctrl+C
+REM When stopped, containers will keep running in background
+REM To stop: docker-compose down
 

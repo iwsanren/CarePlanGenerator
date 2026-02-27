@@ -1,4 +1,4 @@
-# CarePlan Generator - Day 2 MVP
+# CarePlan Generator - Day 2-3 MVP
 
 这是一个最小可行版本（MVP），用于体验同步调用LLM生成care plan的流程。
 
@@ -7,6 +7,13 @@
 - 体验前端 + 后端 + PostgreSQL + LLM 的完整流程
 - 感受**同步调用的缺点**：提交表单后需要等待 10-30 秒
 - 理解为什么后续需要引入异步处理
+
+## 🎯 Day 3 学习目标
+
+- 理解数据库表之间的关系（Patient → Order → CarePlan）
+- 学习使用 TablePlus 查看数据库
+- 体验 Mock Data 的导入（自动 + 手动两种方式）
+- 理解外键（Foreign Key）的作用
 
 ## 🏗️ 架构
 
@@ -52,6 +59,17 @@ docker-compose up --build
 
 等待服务启动完成（大约 1-2 分钟）。
 
+**Day 3 新增功能**：应用启动时会自动导入 Mock Data（测试数据）。
+你会在日志中看到：
+```
+开始初始化 Mock Data...
+Mock Data 初始化完成！
+创建了 3 个 Providers
+创建了 5 个 Patients
+创建了 7 个 Orders
+创建了 7 个 Care Plans
+```
+
 ### 3. 访问应用
 
 打开浏览器访问：**http://localhost:8080**
@@ -84,6 +102,52 @@ Progressive muscle weakness over 2 weeks.
 Positive AChR antibody test.
 MGFA class IIb.
 ```
+
+## 📊 Day 3: 查看 Mock Data（使用 TablePlus）
+
+启动应用后，数据库已经有测试数据了。你可以用 TablePlus 查看：
+
+**连接信息：**
+- Host: `localhost`
+- Port: `5432`
+- User: `careplan_user`
+- Password: `careplan_password`
+- Database: `careplan`
+
+**查看已有数据：**
+- **3 个医生**（李医生、王医生、张医生）
+- **5 个病人**（张三、李四、王五、赵六、陈七）
+- **7 个订单**（包含不同状态的 Care Plans）
+  - ✅ COMPLETED (3个) - 已完成
+  - ⏳ PROCESSING (1个) - 处理中
+  - 🕐 PENDING (2个) - 等待中
+  - ❌ FAILED (1个) - 失败
+
+**试试这些 SQL 查询：**
+
+```sql
+-- 查看所有订单
+SELECT 
+    p.first_name || ' ' || p.last_name as patient_name,
+    pr.name as provider_name,
+    o.medication_name,
+    cp.status
+FROM orders o
+JOIN patients p ON o.patient_id = p.id
+JOIN providers pr ON o.provider_id = pr.id
+LEFT JOIN care_plans cp ON cp.order_id = o.id;
+
+-- 查看张三的所有订单（他有3个订单）
+SELECT 
+    o.medication_name,
+    cp.status
+FROM orders o
+JOIN patients p ON o.patient_id = p.id
+LEFT JOIN care_plans cp ON cp.order_id = o.id
+WHERE p.first_name = '张' AND p.last_name = '三';
+```
+
+**详细说明：** 查看 `backend/notes/DAY3/QUICKSTART.md`
 
 ## 🔍 体验痛点
 

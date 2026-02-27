@@ -7,14 +7,14 @@ services:
     container_name: careplan-postgres
     environment:
       POSTGRES_DB: careplan
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: careplan_user
+      POSTGRES_PASSWORD: careplan_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U careplan_user"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,11 +29,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # 数据库连接配置（固定值，和上面的 postgres 配置一致）
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/careplan
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_USERNAME: careplan_user
+      SPRING_DATASOURCE_PASSWORD: careplan_password
+      # LLM API 配置（从 .env 读取）
       LLM_API_KEY: ${LLM_API_KEY}
-      LLM_API_URL: https://api.openai.com/v1/chat/completions
+      LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
     ports:
       - "8080:8080"
     restart: unless-stopped

@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@RestController
+@RestController // 处理 REST API， 确保返回将对象序列化成json
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
