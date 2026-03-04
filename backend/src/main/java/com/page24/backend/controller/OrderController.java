@@ -4,7 +4,7 @@ import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.entity.*;
 import com.page24.backend.repository.*;
-import com.page24.backend.service.LLMService;
+import com.page24.backend.service.QueueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -24,7 +24,7 @@ public class OrderController {
     private final ProviderRepository providerRepository;
     private final OrderRepository orderRepository;
     private final CarePlanRepository carePlanRepository;
-    private final LLMService llmService;
+    private final QueueService queueService;  // Day 4: 引入队列服务
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
@@ -65,28 +65,11 @@ public class OrderController {
         carePlan.setStatus(CarePlan.Status.PENDING);
         carePlan = carePlanRepository.save(carePlan);
 
-        // 5. 同步调用 LLM 生成 care plan（这里会等待，用户会感觉到慢）
-        try {
-            carePlan.setStatus(CarePlan.Status.PROCESSING);
-            carePlan = carePlanRepository.save(carePlan);
+        // ✨ Day 4 改进：不再同步调用 LLM，而是放入队列
+        // 5. 把任务放进 Redis 队列
+        queueService.enqueue(carePlan.getId());
 
-            // 构建患者信息
-            String patientInfo = buildPatientInfo(patient, order);
-
-            // 调用 LLM（这里会阻塞 10-30 秒）
-            String carePlanContent = llmService.generateCarePlan(patientInfo);
-
-            carePlan.setContent(carePlanContent);
-            carePlan.setStatus(CarePlan.Status.COMPLETED);
-            carePlan = carePlanRepository.save(carePlan);
-
-        } catch (Exception e) {
-            carePlan.setStatus(CarePlan.Status.FAILED);
-            carePlan.setContent("Error: " + e.getMessage());
-            carePlan = carePlanRepository.save(carePlan);
-        }
-
-        // 6. 返回结果
+        // 6. 立即返回结果（用户只需要等 ~100ms）
         return ResponseEntity.ok(toResponse(order, carePlan));
     }
 
