@@ -284,12 +284,21 @@
     <script>
         const API_BASE_URL = 'http://localhost:8080/api/orders';
 
+        // Day 6: 用于存储当前的轮询定时器，方便停止
+        let pollingTimer = null;
+
         document.getElementById('orderForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const submitBtn = document.getElementById('submitBtn');
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
+
+            // 如果之前有轮询在跑，先停掉
+            if (pollingTimer) {
+                clearInterval(pollingTimer);
+                pollingTimer = null;
+            }
 
             submitBtn.disabled = true;
             loading.classList.add('show');
@@ -312,37 +321,105 @@
             try {
                 const response = await fetch(API_BASE_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestData)
                 });
 
                 const data = await response.json();
 
+                // ✨ Day 6 改进：POST 只是拿到 orderId，然后立刻启动 Polling
+                // 不再等 LLM 生成完才返回，用户不用傻等
                 document.getElementById('orderId').textContent = data.id;
-
-                const statusElement = document.getElementById('status');
-                statusElement.textContent = data.status;
-                statusElement.className = 'status ' + data.status.toLowerCase();
-
-                if (data.status === 'COMPLETED' && data.carePlanContent) {
-                    document.getElementById('carePlanSection').style.display = 'block';
-                    document.getElementById('carePlanContent').textContent = data.carePlanContent;
-                } else {
-                    document.getElementById('carePlanSection').style.display = 'none';
-                }
-
                 result.classList.add('show');
-                loadOrders();
+
+                // 更新状态显示为 PENDING，开始转圈等待
+                updateStatusDisplay('PENDING', null);
+
+                // 启动轮询，每 3 秒问一次后端"好了没？"
+                startPolling(data.id);
 
             } catch (error) {
                 alert('Error: ' + error.message);
-            } finally {
                 submitBtn.disabled = false;
                 loading.classList.remove('show');
             }
         });
+
+        // Day 6: Polling 核心函数
+        // 每 3 秒调用 GET /api/orders/{id}/status
+        // completed 或 failed 时停止
+        function startPolling(orderId) {
+            const loading = document.getElementById('loading');
+            const submitBtn = document.getElementById('submitBtn');
+
+            // 立刻查一次，不用等第一个 3 秒
+            checkStatus(orderId);
+
+            // 然后每 3 秒查一次
+            pollingTimer = setInterval(async () => {
+                const done = await checkStatus(orderId);
+                if (done) {
+                    // 完成了！停止轮询
+                    clearInterval(pollingTimer);
+                    pollingTimer = null;
+                    loading.classList.remove('show');
+                    submitBtn.disabled = false;
+                    loadOrders(); // 刷新订单列表
+                }
+            }, 3000);
+
+            // 安全保护：超过 2 分钟还没好，停止轮询，显示超时提示
+            setTimeout(() => {
+                if (pollingTimer) {
+                    clearInterval(pollingTimer);
+                    pollingTimer = null;
+                    loading.classList.remove('show');
+                    submitBtn.disabled = false;
+                    updateStatusDisplay('TIMEOUT', null);
+                }
+            }, 120000);
+        }
+
+        // 查询一次状态，返回 true 表示"结束了（completed 或 failed）"
+        async function checkStatus(orderId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${orderId}/status`);
+                const data = await response.json();
+
+                updateStatusDisplay(data.status, data.carePlanContent);
+
+                // completed 或 failed 都算"结束"，通知 Polling 停下来
+                return data.status === 'COMPLETED' || data.status === 'FAILED';
+            } catch (error) {
+                console.error('Polling error:', error);
+                return false; // 出错了就继续重试
+            }
+        }
+
+        // 根据状态更新页面显示
+        function updateStatusDisplay(status, carePlanContent) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = status;
+            statusElement.className = 'status ' + status.toLowerCase();
+
+            const carePlanSection = document.getElementById('carePlanSection');
+
+            if (status === 'COMPLETED' && carePlanContent) {
+                carePlanSection.style.display = 'block';
+                document.getElementById('carePlanContent').textContent = carePlanContent;
+            } else if (status === 'FAILED') {
+                carePlanSection.style.display = 'block';
+                document.getElementById('carePlanContent').textContent =
+                    '❌ Care plan generation failed. Please try again.';
+            } else if (status === 'TIMEOUT') {
+                carePlanSection.style.display = 'block';
+                document.getElementById('carePlanContent').textContent =
+                    '⏰ Generation is taking longer than expected. Please refresh and check the order list.';
+            } else {
+                // PENDING 或 PROCESSING：继续转圈，不显示内容
+                carePlanSection.style.display = 'none';
+            }
+        }
 
         async function loadOrders() {
             try {

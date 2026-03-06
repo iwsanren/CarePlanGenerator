@@ -73,6 +73,19 @@ public class OrderController {
         return ResponseEntity.ok(toResponse(order, carePlan));
     }
 
+    // Day 6: Polling 状态查询 API
+    // 前端每隔 3 秒调用这个接口，知道 CarePlan 生成好了没
+    @GetMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> getCarePlanStatus(@PathVariable Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        CarePlan carePlan = carePlanRepository.findByOrderId(id)
+                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
+
+        return ResponseEntity.ok(toResponse(order, carePlan));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrder(@PathVariable Long id) {
         Order order = orderRepository.findById(id)
