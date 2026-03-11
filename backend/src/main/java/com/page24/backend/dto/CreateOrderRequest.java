@@ -3,6 +3,9 @@ package com.page24.backend.dto;
 import lombok.Data;
 import java.time.LocalDate;
 
+/**
+ * 前端发请求时带的数据：用户提交的表单
+ */
 @Data
 public class CreateOrderRequest {
     private String patientFirstName;
