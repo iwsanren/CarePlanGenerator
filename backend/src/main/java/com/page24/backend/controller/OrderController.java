@@ -2,174 +2,65 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderResponse;
-import com.page24.backend.entity.*;
-import com.page24.backend.repository.*;
-import com.page24.backend.service.QueueService;
+import com.page24.backend.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.stream.Collectors;
 
-@RestController // 处理 REST API， 确保返回将对象序列化成json
+/**
+ * OrderController - HTTP 请求/响应层
+ *
+ * 职责：只管"收"和"发"
+ *   - 读取请求参数
+ *   - 调用 OrderService 拿结果
+ *   - 设置 HTTP 状态码和响应头，返回给前端
+ *
+ * 不做任何业务判断，不直接操作数据库，不知道 Redis 是什么。
+ */
+@RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final PatientRepository patientRepository;
-    private final ProviderRepository providerRepository;
-    private final OrderRepository orderRepository;
-    private final CarePlanRepository carePlanRepository;
-    private final QueueService queueService;  // Day 4: 引入队列服务
+    private final OrderService orderService;
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
-        // 1. 找到或创建 Patient
-        Patient patient = patientRepository.findByMrn(request.getPatientMrn())
-                .orElseGet(() -> {
-                    Patient newPatient = new Patient();
-                    newPatient.setFirstName(request.getPatientFirstName());
-                    newPatient.setLastName(request.getPatientLastName());
-                    newPatient.setMrn(request.getPatientMrn());
-                    newPatient.setDateOfBirth(request.getPatientDateOfBirth());
-                    return patientRepository.save(newPatient);
-                });
-
-        // 2. 找到或创建 Provider
-        Provider provider = providerRepository.findByNpi(request.getProviderNpi())
-                .orElseGet(() -> {
-                    Provider newProvider = new Provider();
-                    newProvider.setName(request.getProviderName());
-                    newProvider.setNpi(request.getProviderNpi());
-                    return providerRepository.save(newProvider);
-                });
-
-        // 3. 创建 Order
-        Order order = new Order();
-        order.setPatient(patient);
-        order.setProvider(provider);
-        order.setMedicationName(request.getMedicationName());
-        order.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
-        order.setAdditionalDiagnosis(request.getAdditionalDiagnosis());
-        order.setMedicationHistory(request.getMedicationHistory());
-        order.setPatientRecords(request.getPatientRecords());
-        order = orderRepository.save(order);
-
-        // 4. 创建 CarePlan，状态为 PENDING
-        CarePlan carePlan = new CarePlan();
-        carePlan.setOrder(order);
-        carePlan.setStatus(CarePlan.Status.PENDING);
-        carePlan = carePlanRepository.save(carePlan);
-
-        // ✨ Day 4 改进：不再同步调用 LLM，而是放入队列
-        // 5. 把任务放进 Redis 队列
-        queueService.enqueue(carePlan.getId());
-
-        // 6. 立即返回结果（用户只需要等 ~100ms）
-        return ResponseEntity.ok(toResponse(order, carePlan));
+        OrderResponse response = orderService.createOrder(request);
+        return ResponseEntity.ok(response);
     }
 
     // Day 6: Polling 状态查询 API
-    // 前端每隔 3 秒调用这个接口，知道 CarePlan 生成好了没
     @GetMapping("/{id}/status")
     public ResponseEntity<OrderResponse> getCarePlanStatus(@PathVariable Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
-
-        return ResponseEntity.ok(toResponse(order, carePlan));
+        return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrder(@PathVariable Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
-
-        return ResponseEntity.ok(toResponse(order, carePlan));
+        return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
     @GetMapping
     public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        List<OrderResponse> responses = orders.stream()
-                .map(order -> {
-                    CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
-                    return toResponse(order, carePlan);
-                })
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(orderService.getAllOrders());
     }
 
-    // 搜索功能：根据患者名字或 MRN 搜索
     @GetMapping("/search")
     public ResponseEntity<List<OrderResponse>> searchOrders(
             @RequestParam(required = false) String patientName,
             @RequestParam(required = false) String mrn) {
-
-        List<Order> orders;
-
-        if (mrn != null && !mrn.isEmpty()) {
-            // 根据 MRN 搜索
-            Patient patient = patientRepository.findByMrn(mrn).orElse(null);
-            if (patient != null) {
-                orders = orderRepository.findByPatient(patient);
-            } else {
-                orders = List.of();
-            }
-        } else if (patientName != null && !patientName.isEmpty()) {
-            // 根据患者名字搜索（支持模糊搜索）
-            List<Patient> patients = patientRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-                    patientName, patientName);
-            orders = patients.stream()
-                    .flatMap(patient -> orderRepository.findByPatient(patient).stream())
-                    .collect(Collectors.toList());
-        } else {
-            // 如果没有提供搜索条件，返回所有订单
-            orders = orderRepository.findAll();
-        }
-
-        List<OrderResponse> responses = orders.stream()
-                .map(order -> {
-                    CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
-                    return toResponse(order, carePlan);
-                })
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(orderService.searchOrders(patientName, mrn));
     }
 
-    // 下载功能：下载 CarePlan 为文本文件
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> downloadCarePlan(@PathVariable Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
-
-        if (carePlan.getStatus() != CarePlan.Status.COMPLETED) {
-            throw new RuntimeException("CarePlan is not completed yet");
-        }
-
-        // 构建文件内容
-        String content = buildDownloadContent(order, carePlan);
-        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-
-        // 设置文件名：CarePlan_PatientName_OrderId.txt
-        String filename = String.format("CarePlan_%s_%s_%d.txt",
-                order.getPatient().getFirstName(),
-                order.getPatient().getLastName(),
-                order.getId());
+        byte[] bytes = orderService.getDownloadBytes(id);
+        String filename = orderService.getDownloadFilename(id);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
@@ -177,100 +68,4 @@ public class OrderController {
                 .contentLength(bytes.length)
                 .body(bytes);
     }
-
-    private String buildPatientInfo(Patient patient, Order order) {
-        return String.format("""
-                Name: %s %s
-                MRN: %s
-                DOB: %s
-                Medication: %s
-                Primary Diagnosis: %s
-                Additional Diagnoses: %s
-                Medication History: %s
-                Patient Records: %s
-                """,
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getMrn(),
-                patient.getDateOfBirth(),
-                order.getMedicationName(),
-                order.getPrimaryDiagnosis(),
-                order.getAdditionalDiagnosis(),
-                order.getMedicationHistory(),
-                order.getPatientRecords()
-        );
-    }
-
-    private OrderResponse toResponse(Order order, CarePlan carePlan) {
-        OrderResponse response = new OrderResponse();
-        response.setId(order.getId());
-        response.setPatientId(order.getPatient().getId());
-        response.setProviderId(order.getProvider().getId());
-        response.setMedicationName(order.getMedicationName());
-
-        if (carePlan != null) {
-            response.setStatus(carePlan.getStatus().name());
-            // 只有在 COMPLETED 状态时才返回内容
-            if (carePlan.getStatus() == CarePlan.Status.COMPLETED) {
-                response.setCarePlanContent(carePlan.getContent());
-            }
-        } else {
-            response.setStatus("PENDING");
-        }
-
-        return response;
-    }
-
-    private String buildDownloadContent(Order order, CarePlan carePlan) {
-        Patient patient = order.getPatient();
-        Provider provider = order.getProvider();
-
-        return String.format("""
-                ================================================================================
-                                            CARE PLAN
-                ================================================================================
-                
-                PATIENT INFORMATION
-                --------------------------------------------------------------------------------
-                Name: %s %s
-                MRN: %s
-                Date of Birth: %s
-                
-                PROVIDER INFORMATION
-                --------------------------------------------------------------------------------
-                Provider: %s
-                NPI: %s
-                
-                ORDER INFORMATION
-                --------------------------------------------------------------------------------
-                Order ID: %d
-                Medication: %s
-                Primary Diagnosis: %s
-                Additional Diagnoses: %s
-                
-                CARE PLAN CONTENT
-                ================================================================================
-                %s
-                
-                ================================================================================
-                Generated on: %s
-                Status: %s
-                ================================================================================
-                """,
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getMrn(),
-                patient.getDateOfBirth(),
-                provider.getName(),
-                provider.getNpi(),
-                order.getId(),
-                order.getMedicationName(),
-                order.getPrimaryDiagnosis(),
-                order.getAdditionalDiagnosis(),
-                carePlan.getContent(),
-                carePlan.getUpdatedAt(),
-                carePlan.getStatus()
-        );
-    }
 }
-
