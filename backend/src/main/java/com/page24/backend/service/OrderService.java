@@ -8,9 +8,15 @@ import com.page24.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -44,19 +50,19 @@ public class OrderService {
      * 原来在 OrderController 第 28-72 行的 createOrder() 方法体
      */
     public OrderResponse createOrder(CreateOrderRequest request) {
-        // 1. 找到或创建 Patient
-        Patient patient = patientRepository.findByMrn(request.getPatientMrn())
-                .orElseGet(() -> {
-                    Patient newPatient = new Patient();
-                    newPatient.setFirstName(request.getPatientFirstName());
-                    newPatient.setLastName(request.getPatientLastName());
-                    newPatient.setMrn(request.getPatientMrn());
-                    newPatient.setDateOfBirth(request.getPatientDateOfBirth());
-                    return patientRepository.save(newPatient);
-                });
+        List<String> warnings = new ArrayList<>();
 
-        // 2. 找到或创建 Provider
+        // 1) Provider 重复检测
         Provider provider = providerRepository.findByNpi(request.getProviderNpi())
+                .map(existingProvider -> {
+                    if (!sameText(existingProvider.getName(), request.getProviderName())) {
+                        throw new ResponseStatusException(
+                                HttpStatus.CONFLICT,
+                                "Provider conflict: same NPI with different provider name"
+                        );
+                    }
+                    return existingProvider;
+                })
                 .orElseGet(() -> {
                     Provider newProvider = new Provider();
                     newProvider.setName(request.getProviderName());
@@ -64,7 +70,79 @@ public class OrderService {
                     return providerRepository.save(newProvider);
                 });
 
-        // 3. 创建 Order
+        // 2) Patient 重复检测
+        Patient patient;
+        Optional<Patient> existingByMrn = patientRepository.findByMrn(request.getPatientMrn());
+
+        if (existingByMrn.isPresent()) {
+            Patient matched = existingByMrn.get();
+            boolean sameName = sameText(matched.getFirstName(), request.getPatientFirstName())
+                    && sameText(matched.getLastName(), request.getPatientLastName());
+            boolean sameDob = matched.getDateOfBirth() != null
+                    && matched.getDateOfBirth().equals(request.getPatientDateOfBirth());
+
+            if (!sameName || !sameDob) {
+                warnings.add("Patient warning: MRN exists but name or DOB is different");
+            }
+            patient = matched;
+        } else {
+            Optional<Patient> existingByNameDob = patientRepository
+                    .findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
+                            request.getPatientFirstName(),
+                            request.getPatientLastName(),
+                            request.getPatientDateOfBirth()
+                    );
+
+            existingByNameDob
+                    .filter(p -> !sameText(p.getMrn(), request.getPatientMrn()))
+                    .ifPresent(p -> warnings.add("Patient warning: same name + DOB exists with different MRN"));
+
+            Patient newPatient = new Patient();
+            newPatient.setFirstName(request.getPatientFirstName());
+            newPatient.setLastName(request.getPatientLastName());
+            newPatient.setMrn(request.getPatientMrn());
+            newPatient.setDateOfBirth(request.getPatientDateOfBirth());
+            patient = patientRepository.save(newPatient);
+        }
+
+        // 3) Order 重复检测
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime nextDayStart = today.plusDays(1).atStartOfDay();
+
+        boolean samePatientMedicationSameDay = orderRepository.existsByPatientAndMedicationNameIgnoreCaseAndCreatedAtBetween(
+                patient,
+                request.getMedicationName(),
+                startOfDay,
+                nextDayStart
+        );
+
+        if (samePatientMedicationSameDay) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Duplicate order: same patient + same medication + same day"
+            );
+        }
+
+        Optional<Order> previousSameMedicationOrder = orderRepository
+                .findFirstByPatientAndMedicationNameIgnoreCaseOrderByCreatedAtDesc(
+                        patient,
+                        request.getMedicationName()
+                );
+
+        if (previousSameMedicationOrder.isPresent()) {
+            warnings.add("Order warning: same patient + same medication exists on a different day");
+            if (!Boolean.TRUE.equals(request.getConfirm())) {
+                OrderResponse warningResponse = new OrderResponse();
+                warningResponse.setResultType("WARNING");
+                warningResponse.setRequiresConfirm(true);
+                warningResponse.setMessage("Potential duplicate order detected. Resubmit with confirm=true to continue.");
+                warningResponse.setWarnings(warnings);
+                return warningResponse;
+            }
+        }
+
+        // 4) 创建 Order
         Order order = new Order();
         order.setPatient(patient);
         order.setProvider(provider);
@@ -75,16 +153,28 @@ public class OrderService {
         order.setPatientRecords(request.getPatientRecords());
         order = orderRepository.save(order);
 
-        // 4. 创建 CarePlan，状态为 PENDING
+        // 5) 创建 CarePlan，状态为 PENDING
         CarePlan carePlan = new CarePlan();
         carePlan.setOrder(order);
         carePlan.setStatus(CarePlan.Status.PENDING);
         carePlan = carePlanRepository.save(carePlan);
 
-        // 5. 把任务放进 Redis 队列（Day 4 异步改进）
+        // 6) 把任务放进 Redis 队列（Day 4 异步改进）
         queueService.enqueue(carePlan.getId());
 
-        return orderMapper.toResponse(order, carePlan);
+        OrderResponse response = orderMapper.toResponse(order, carePlan);
+        if (!warnings.isEmpty()) {
+            response.setMessage("Order created with warnings");
+            response.setWarnings(warnings);
+        }
+        return response;
+    }
+
+    private boolean sameText(String left, String right) {
+        if (left == null || right == null) {
+            return left == null && right == null;
+        }
+        return left.trim().equalsIgnoreCase(right.trim());
     }
 
     /**

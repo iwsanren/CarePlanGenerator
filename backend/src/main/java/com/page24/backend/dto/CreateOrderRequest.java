@@ -21,5 +21,8 @@ public class CreateOrderRequest {
     private String additionalDiagnosis;
     private String medicationHistory;
     private String patientRecords;
+
+    // Day 8: 用户确认 warning 后可继续提交（如不同天同药续方）
+    private Boolean confirm;
 }
 

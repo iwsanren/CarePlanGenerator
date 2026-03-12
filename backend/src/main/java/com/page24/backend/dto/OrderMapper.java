@@ -29,6 +29,8 @@ public class OrderMapper {
         response.setPatientId(order.getPatient().getId());
         response.setProviderId(order.getProvider().getId());
         response.setMedicationName(order.getMedicationName());
+        response.setResultType("SUCCESS");
+        response.setRequiresConfirm(false);
 
         if (carePlan != null) {
             response.setStatus(carePlan.getStatus().name());

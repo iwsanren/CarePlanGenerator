@@ -10,6 +10,11 @@ import java.util.Optional;
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, Long> {
     Optional<Patient> findByMrn(String mrn);
+    Optional<Patient> findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
+            String firstName,
+            String lastName,
+            java.time.LocalDate dateOfBirth
+    );
     List<Patient> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(String firstName, String lastName);
 }
 
