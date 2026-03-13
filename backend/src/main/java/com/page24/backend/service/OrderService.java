@@ -4,18 +4,21 @@ import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderMapper;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.entity.*;
+import com.page24.backend.exception.BlockError;
+import com.page24.backend.exception.ValidationError;
+import com.page24.backend.exception.WarningException;
 import com.page24.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -56,8 +59,8 @@ public class OrderService {
         Provider provider = providerRepository.findByNpi(request.getProviderNpi())
                 .map(existingProvider -> {
                     if (!sameText(existingProvider.getName(), request.getProviderName())) {
-                        throw new ResponseStatusException(
-                                HttpStatus.CONFLICT,
+                        throw new BlockError(
+                                "DUPLICATE_NPI_NAME_MISMATCH",
                                 "Provider conflict: same NPI with different provider name"
                         );
                     }
@@ -118,8 +121,8 @@ public class OrderService {
         );
 
         if (samePatientMedicationSameDay) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new BlockError(
+                    "DUPLICATE_ORDER_SAME_DAY",
                     "Duplicate order: same patient + same medication + same day"
             );
         }
@@ -133,12 +136,14 @@ public class OrderService {
         if (previousSameMedicationOrder.isPresent()) {
             warnings.add("Order warning: same patient + same medication exists on a different day");
             if (!Boolean.TRUE.equals(request.getConfirm())) {
-                OrderResponse warningResponse = new OrderResponse();
-                warningResponse.setResultType("WARNING");
-                warningResponse.setRequiresConfirm(true);
-                warningResponse.setMessage("Potential duplicate order detected. Resubmit with confirm=true to continue.");
-                warningResponse.setWarnings(warnings);
-                return warningResponse;
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("requiresConfirm", true);
+                detail.put("warnings", warnings);
+                throw new WarningException(
+                        "POTENTIAL_DUPLICATE_ORDER_CROSS_DAY",
+                        "Potential duplicate order detected. Resubmit with confirm=true to continue.",
+                        detail
+                );
             }
         }
 
@@ -185,10 +190,10 @@ public class OrderService {
      */
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
 
         CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
+                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
 
         return orderMapper.toResponse(order, carePlan);
     }
@@ -255,13 +260,13 @@ public class OrderService {
      */
     public byte[] getDownloadBytes(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
 
         CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new RuntimeException("CarePlan not found"));
+                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
 
         if (carePlan.getStatus() != CarePlan.Status.COMPLETED) {
-            throw new RuntimeException("CarePlan is not completed yet");
+            throw new BlockError("CAREPLAN_NOT_COMPLETED", "CarePlan is not completed yet");
         }
 
         String content = buildDownloadContent(order, carePlan);
@@ -273,7 +278,7 @@ public class OrderService {
      */
     public String getDownloadFilename(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
 
         return String.format("CarePlan_%s_%s_%d.txt",
                 order.getPatient().getFirstName(),
