@@ -60,6 +60,20 @@ services:
       - "5005:5005"  # 调试端口
     restart: unless-stopped
 
+  # 测试容器：用于在 Docker 中执行 Maven tests
+  backend-test:
+    image: maven:3.9-eclipse-temurin-17-alpine
+    container_name: careplan-backend-test
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - maven_cache:/root/.m2
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      LLM_MOCK_ENABLED: true
+    entrypoint: ["sh", "-c", "chmod +x ./mvnw && ./mvnw -Dspring.profiles.active=test test"]
+
 volumes:
   postgres_data:
+  maven_cache:
 
