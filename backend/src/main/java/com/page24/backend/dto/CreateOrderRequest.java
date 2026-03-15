@@ -13,6 +13,12 @@ import java.time.LocalDate;
 @Data
 public class CreateOrderRequest {
 
+    // ICD-10: letter + 2 chars (digit or letter), optional decimal part (1-4 chars)
+    public static final String ICD10_REGEX = "^[A-Z][0-9][0-9A-Z](\\.[0-9A-Z]{1,4})?$";
+
+    // Comma-separated ICD-10 list, e.g. "I10, E11.9"
+    public static final String ICD10_LIST_REGEX = "^(?:\\s*)$|^(?:[A-Z][0-9][0-9A-Z](?:\\.[0-9A-Z]{1,4})?)(?:\\s*,\\s*[A-Z][0-9][0-9A-Z](?:\\.[0-9A-Z]{1,4})?)*$";
+
     @NotBlank(message = "patientFirstName is required")
     private String patientFirstName;
 
@@ -37,8 +43,10 @@ public class CreateOrderRequest {
     private String medicationName;
 
     @NotBlank(message = "primaryDiagnosis is required")
+    @Pattern(regexp = ICD10_REGEX, message = "primaryDiagnosis must be a valid ICD-10 code")
     private String primaryDiagnosis;
 
+    @Pattern(regexp = ICD10_LIST_REGEX, message = "additionalDiagnosis must be comma-separated ICD-10 codes")
     private String additionalDiagnosis;
     private String medicationHistory;
     private String patientRecords;
