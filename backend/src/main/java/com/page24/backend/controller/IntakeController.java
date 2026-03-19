@@ -39,5 +39,14 @@ public class IntakeController {
         OrderResponse response = intakeService.createFromPharmaCorpXml(rawXml, confirm);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @PostMapping(value = "/hospital-d", consumes = {MediaType.TEXT_PLAIN_VALUE, "text/csv"})
+    public ResponseEntity<OrderResponse> createFromHospitalD(
+            @RequestBody @NotBlank(message = "Hospital D payload is required") String rawCsv,
+            @RequestParam(defaultValue = "false") boolean confirm
+    ){
+        OrderResponse response = intakeService.createFromHospitalDCsv(rawCsv, confirm);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 }
 

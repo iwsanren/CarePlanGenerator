@@ -88,6 +88,19 @@ class IntakeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /api/intake/hospital-d - success + pending + enqueue")
+    void shouldCreateOrderFromHospitalD() throws Exception {
+        mockMvc.perform(post("/api/intake/hospital-d")
+                        .contentType("text/csv")
+                        .content(hospitalDCsv("Privigen", "1122334455", "456789", "G70.00")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultType").value("SUCCESS"))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        verify(queueService, atLeastOnce()).enqueue(anyLong());
+    }
+
+    @Test
     @DisplayName("intake validation - invalid NPI should return 400")
     void shouldReturnValidationErrorForInvalidNpi() throws Exception {
         mockMvc.perform(post("/api/intake/clinic-b")
@@ -229,6 +242,13 @@ class IntakeControllerIntegrationTest {
                     </ClinicalDocumentation>
                 </CareOrderRequest>
                 """, mrn, npi, primaryDx, medicationName);
+    }
+
+    private String hospitalDCsv(String medicationName, String npi, String mrn, String primaryDx) {
+        return String.format("""
+                source_system,request_id,created_at,pt_id,pt_given,pt_family,pt_dob_yyyymmdd,doc_npi,doc_full_name,drug_label,dx_primary,dx_extra,med_hist_blob,clinical_note_blob
+                HOSPITAL_D,REQ-9001,2026-03-19T10:30:00Z,%s,Olivia,Brown,19910417,%s,Dr. Sarah Lee,%s,%s,I10|E11.9,Metformin 500mg BID;Lisinopril 10mg QD,Progressive weakness for 2 weeks
+                """, mrn, npi, medicationName, primaryDx).trim();
     }
 }
 

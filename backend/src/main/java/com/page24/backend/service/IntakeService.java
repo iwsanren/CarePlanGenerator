@@ -5,6 +5,7 @@ import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.intake.ClinicBAdapter;
 import com.page24.backend.intake.Common;
+import com.page24.backend.intake.HospitalDAdapter;
 import com.page24.backend.intake.IntakeAdapterFactory;
 import com.page24.backend.intake.InternalOrder;
 import com.page24.backend.intake.PharmaCorp;
@@ -14,6 +15,7 @@ import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -42,6 +44,25 @@ public class IntakeService {
         return orderService.createOrder(mappedRequest);
     }
 
+    //TODO:
+    // 处理csv格式的数据，并将结果return给controller。
+    public OrderResponse createFromHospitalDCsv(String rawCsv, boolean confirm){
+        HospitalDAdapter hospitalDAdapter = intakeAdapterFactory.getAdapter("hospital-d", HospitalDAdapter.class);
+        HospitalDAdapter.HospitalDPayload payload = hospitalDAdapter.parse(rawCsv);
+
+        InternalOrder internalOrder = hospitalDAdapter.transform(payload);
+        hospitalDAdapter.validate(internalOrder);
+
+        CreateOrderRequest mappedRequest = toCreateOrderRequest(
+                internalOrder,
+                payload.getMedicationHistory(),
+                payload.getClinicalNotes(),
+                confirm
+        );
+        validateMappedRequest(mappedRequest);
+        return orderService.createOrder(mappedRequest);
+    }
+
     public OrderResponse createFromPharmaCorpXml(String rawXml, Boolean confirm) {
         try {
             PharmaCorp.PharmaCorpPayload payload = pharmaCorp.parseInput(rawXml);
@@ -60,6 +81,15 @@ public class IntakeService {
             ClinicBAdapter.ClinicBPayload payload,
             Boolean confirm
     ) {
+        return toCreateOrderRequest(internalOrder, payload.getMedHx(), payload.getClinicalNotes(), confirm);
+    }
+
+    private CreateOrderRequest toCreateOrderRequest(
+            InternalOrder internalOrder,
+            List<String> medicationHistory,
+            String clinicalNotes,
+            Boolean confirm
+    ) {
         CreateOrderRequest request = new CreateOrderRequest();
 
         request.setPatientFirstName(internalOrder.getPatient().getFirstName());
@@ -74,8 +104,8 @@ public class IntakeService {
         request.setPrimaryDiagnosis(internalOrder.getDiagnosis().getPrimaryDiagnosis());
         request.setAdditionalDiagnosis(Common.joinByComma(internalOrder.getDiagnosis().getAdditionalDiagnoses()));
 
-        request.setMedicationHistory(Common.joinByNewLine(payload.getMedHx()));
-        request.setPatientRecords(payload.getClinicalNotes());
+        request.setMedicationHistory(Common.joinByNewLine(medicationHistory));
+        request.setPatientRecords(clinicalNotes);
         request.setConfirm(Boolean.TRUE.equals(confirm));
 
         return request;
