@@ -10,7 +10,6 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +25,11 @@ public class ClinicBAdapter implements BaseIntakeAdapter<ClinicBAdapter.ClinicBP
     // Keep mapper local so adapter does not depend on ObjectMapper bean registration.
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Validator validator;
+
+    @Override
+    public String source() {
+        return "clinic-b";
+    }
 
     @Override
     public ClinicBPayload parse(String rawPayload) throws IntakeParseException {

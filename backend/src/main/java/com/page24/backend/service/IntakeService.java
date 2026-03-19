@@ -5,6 +5,7 @@ import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.intake.ClinicBAdapter;
 import com.page24.backend.intake.Common;
+import com.page24.backend.intake.IntakeAdapterFactory;
 import com.page24.backend.intake.InternalOrder;
 import com.page24.backend.intake.PharmaCorp;
 import jakarta.validation.ConstraintViolation;
@@ -25,11 +26,12 @@ public class IntakeService {
 
     private final Validator validator;
     private final OrderService orderService;
-    private final ClinicBAdapter clinicBAdapter;
+    private final IntakeAdapterFactory intakeAdapterFactory;
 
     private final PharmaCorp pharmaCorp = new PharmaCorp();
 
     public OrderResponse createFromClinicBJson(String rawJson, Boolean confirm) {
+        ClinicBAdapter clinicBAdapter = intakeAdapterFactory.getAdapter("clinic-b", ClinicBAdapter.class);
         ClinicBAdapter.ClinicBPayload payload = clinicBAdapter.parse(rawJson);
 
         InternalOrder internalOrder = clinicBAdapter.transform(payload);

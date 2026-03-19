@@ -19,6 +19,12 @@ package com.page24.backend.intake;
 public interface BaseIntakeAdapter<TSourceDto> {
 
     /**
+     * Canonical source identifier handled by this adapter.
+     * Example: "clinic-b", "pharma-corp".
+     */
+    String source();
+
+    /**
      * Parse raw payload text into source-specific DTO.
      *
      * @param rawPayload raw incoming payload string (JSON/XML/etc.)
