@@ -1,0 +1,38 @@
+package com.page24.backend.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * Local/mock provider：开发和测试时使用，不调用外部 API。
+ */
+@Service("local")
+@Slf4j
+public class LocalLLM implements BaseLLMService {
+
+    @Override
+    public String generateCarePlan(String patientInfo) {
+        log.info("[LOCAL LLM] 使用 mock 内容生成 care plan, patientInfoLength={}", patientInfo.length());
+        return """
+                [LOCAL MOCK CARE PLAN]
+
+                Problem list
+                - Need for therapy optimization
+                - Potential adherence risk
+
+                Goals
+                - Improve symptom control in 2 weeks
+                - Minimize adverse events during treatment
+
+                Pharmacist interventions
+                - Verify dose and administration schedule
+                - Provide adverse event counseling
+                - Reconcile medication history
+
+                Monitoring plan
+                - Baseline CBC/BMP and vitals
+                - Infusion-day vitals every 15-30 minutes
+                - Follow-up renal function in 3-7 days
+                """;
+    }
+}

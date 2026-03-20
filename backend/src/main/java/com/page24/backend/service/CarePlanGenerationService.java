@@ -32,7 +32,8 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class CarePlanGenerationService {
 
-    private final LLMService llmService;
+    // 业务层不直接依赖 OpenAI/Claude：通过 factory 选出当前 provider。
+    private final LLMAdapterFactory llmAdapterFactory;
     private final CarePlanRepository carePlanRepository;
 
     /**
@@ -64,7 +65,7 @@ public class CarePlanGenerationService {
 
         // 调用 LLM（这里可能失败，失败了 @Retryable 会自动重试）
         log.info("🤖 调用 LLM 生成 Care Plan... (carePlanId={})", carePlanId);
-        String content = llmService.generateCarePlan(patientInfo);
+        String content = llmAdapterFactory.getService().generateCarePlan(patientInfo);
 
         // 成功：更新数据库
         carePlan.setContent(content);
