@@ -73,7 +73,30 @@ services:
       LLM_MOCK_ENABLED: true
     entrypoint: ["sh", "-c", "chmod +x ./mvnw && ./mvnw -Dspring.profiles.active=test test"]
 
+  # Prometheus：抓取 Spring Boot 指标
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: careplan-prometheus
+    volumes:
+      - ./notes/Day11_Monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  # Grafana：可视化指标
+  grafana:
+    image: grafana/grafana:latest
+    container_name: careplan-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+
 volumes:
   postgres_data:
   maven_cache:
+  grafana_data:
 
