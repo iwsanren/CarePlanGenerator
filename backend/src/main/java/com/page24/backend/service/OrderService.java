@@ -11,6 +11,7 @@ import com.page24.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -44,7 +45,7 @@ public class OrderService {
     private final ProviderRepository providerRepository;
     private final OrderRepository orderRepository;
     private final CarePlanRepository carePlanRepository;
-    private final QueueService queueService;
+    private final CarePlanQueue carePlanQueue;
     private final OrderMapper orderMapper;
 
     /**
@@ -52,6 +53,7 @@ public class OrderService {
      *
      * 原来在 OrderController 第 28-72 行的 createOrder() 方法体
      */
+    @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
         List<String> warnings = new ArrayList<>();
 
@@ -164,8 +166,8 @@ public class OrderService {
         carePlan.setStatus(CarePlan.Status.PENDING);
         carePlan = carePlanRepository.save(carePlan);
 
-        // 6) 把任务放进 Redis 队列（Day 4 异步改进）
-        queueService.enqueue(carePlan.getId());
+        // 6) 把任务放进队列。本地是 Redis，AWS Lambda profile 下是 SQS。
+        carePlanQueue.enqueue(carePlan.getId());
 
         OrderResponse response = orderMapper.toResponse(order, carePlan);
         if (!warnings.isEmpty()) {

@@ -4,6 +4,7 @@ import com.page24.backend.entity.CarePlan;
 import com.page24.backend.repository.CarePlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
  * 2. 把任务交给 CarePlanGenerationService 处理（它负责 LLM 调用和重试）
  */
 @Service
+@Profile("!lambda")
 @RequiredArgsConstructor
 @Slf4j
 public class CarePlanWorker {
