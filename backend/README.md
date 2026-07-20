@@ -1,269 +1,366 @@
-# CarePlan Generator - Day 2-3 MVP
+# CarePlan Generator Backend
 
-这是一个最小可行版本（MVP），用于体验同步调用LLM生成care plan的流程。
+This is a Java/Spring Boot learning project that builds a care plan generation backend step by step. The project starts from a small MVP and gradually introduces database modeling, async processing, queues, workers, polling, validation, tests, adapter patterns, monitoring, and AWS deployment concepts.
 
-## 🎯 Day 2 学习目标
+The goal is not to jump straight to a perfect architecture. Each stage intentionally exposes a small limitation, so the next topic feels necessary instead of arbitrary.
 
-- 体验前端 + 后端 + PostgreSQL + LLM 的完整流程
-- 感受**同步调用的缺点**：提交表单后需要等待 10-30 秒
-- 理解为什么后续需要引入异步处理
+## Current Status
 
-## 🎯 Day 3 学习目标
+This backend is no longer the early Day 2-3 synchronous MVP. The current codebase includes local async processing, multi-source intake APIs, monitoring support, and AWS Lambda/SQS practice code.
 
-- 理解数据库表之间的关系（Patient → Order → CarePlan）
-- 学习使用 TablePlus 查看数据库
-- 体验 Mock Data 的导入（自动 + 手动两种方式）
-- 理解外键（Foreign Key）的作用
+Implemented pieces:
 
-## 🏗️ 架构
+- Spring Boot REST API
+- PostgreSQL persistence for `Patient`, `Provider`, `Order`, and `CarePlan`
+- Redis-backed queue for care plan generation jobs
+- Scheduled worker that consumes queued jobs and calls an LLM provider
+- Polling API for checking care plan generation status
+- Request validation, warning handling, and unified error responses
+- Adapter Pattern for ingesting orders from different external sources
+- Unit and integration tests
+- Prometheus and Grafana local monitoring setup
+- AWS Lambda / SQS handler and packaging practice code
 
+## Tech Stack
+
+- Java 17
+- Spring Boot 4.0.2
+- Spring Web MVC
+- Spring Data JPA
+- PostgreSQL 15
+- Redis 7
+- Spring Retry
+- Micrometer + Prometheus
+- JUnit / Spring Boot Test
+- Docker / Docker Compose
+- LLM providers: OpenAI, Claude, or local mock
+
+## Project Structure
+
+```text
+src/main/java/com/page24/backend
+├── controller/      # REST controllers: HTTP request/response boundary
+├── service/         # Business logic, queueing, workers, LLM calls
+├── repository/      # Spring Data JPA repositories
+├── entity/          # JPA entities
+├── dto/             # Request/response DTOs and mappers
+├── exception/       # Unified API error handling
+├── intake/          # Multi-source intake adapters
+├── aws/lambda/      # AWS Lambda / SQS practice code
+└── config/          # Web and Redis configuration
 ```
-前端 (HTML) → 后端 (Spring Boot) → PostgreSQL 数据库
-                    ↓
-                 LLM API (OpenAI)
+
+Important entry points:
+
+- Application entry: `src/main/java/com/page24/backend/BackendApplication.java`
+- Main order API: `src/main/java/com/page24/backend/controller/OrderController.java`
+- Intake API: `src/main/java/com/page24/backend/controller/IntakeController.java`
+- Order business logic: `src/main/java/com/page24/backend/service/OrderService.java`
+- Background worker: `src/main/java/com/page24/backend/service/CarePlanWorker.java`
+- Care plan generation: `src/main/java/com/page24/backend/service/CarePlanGenerationService.java`
+
+## Quick Start
+
+### 1. Create an environment file
+
+Copy `.env.example` to `.env`.
+
+Windows:
+
+```powershell
+copy .env.example .env
 ```
 
-**流程：**
-1. 用户填写表单提交
-2. 后端接收请求
-3. 保存 Patient、Provider、Order 到数据库
-4. 创建 CarePlan（status = PENDING）
-5. **同步调用 LLM**（这里会阻塞 10-30 秒）⏳
-6. 更新 CarePlan（status = COMPLETED，保存生成的内容）
-7. 返回结果给前端
+Mac/Linux:
 
-## 📋 前置条件
-
-- Docker Desktop 已安装并运行
-- OpenAI API Key（或 Claude API Key）
-
-## 🚀 快速开始
-
-### 1. 配置 API Key
-
-复制 `.env.example` 为 `.env`：
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，填入你的 OpenAI API Key：
-```
-LLM_API_KEY=sk-your-actual-api-key-here
+For local development, the project can use a mock LLM provider. This does not require a real API key:
+
+```env
+LLM_MOCK_ENABLED=true
 ```
 
-### 2. 启动服务
+To use real OpenAI calls:
+
+```env
+LLM_MOCK_ENABLED=false
+LLM_PROVIDER=openai
+LLM_API_KEY=your-openai-api-key
+LLM_OPENAI_MODEL=gpt-3.5-turbo
+```
+
+To use Claude:
+
+```env
+LLM_MOCK_ENABLED=false
+LLM_PROVIDER=claude
+CLAUDE_API_KEY=your-claude-api-key
+CLAUDE_MODEL=claude-3-5-sonnet-latest
+```
+
+### 2. Start the services
 
 ```bash
 docker-compose up --build
 ```
 
-等待服务启动完成（大约 1-2 分钟）。
+Available URLs:
 
-**Day 3 新增功能**：应用启动时会自动导入 Mock Data（测试数据）。
-你会在日志中看到：
-```
-开始初始化 Mock Data...
-Mock Data 初始化完成！
-创建了 3 个 Providers
-创建了 5 个 Patients
-创建了 7 个 Orders
-创建了 7 个 Care Plans
-```
+- Frontend page: http://localhost:8080
+- Backend API: http://localhost:8080/api/orders
+- Actuator health: http://localhost:8080/actuator/health
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
 
-### 3. 访问应用
+On first startup, the application inserts mock data automatically. If the database already has data, initialization is skipped.
 
-打开浏览器访问：**http://localhost:8080**
+### 3. Stop the services
 
-### 4. 测试流程
-
-1. 填写表单（所有带 * 的字段都是必填）
-2. 点击 "Generate CarePlan"
-3. **等待 10-30 秒**（这就是同步调用的缺点！）
-4. 看到结果
-
-## 📝 示例数据
-
-**Patient Information:**
-- First Name: John
-- Last Name: Doe
-- MRN: 123456
-- DOB: 1980-01-01
-
-**Provider Information:**
-- Provider Name: Dr. Smith
-- NPI: 1234567890
-
-**Clinical Information:**
-- Medication Name: IVIG
-- Primary Diagnosis: G70.00 (Myasthenia gravis)
-- Patient Records: 
-```
-Progressive muscle weakness over 2 weeks.
-Positive AChR antibody test.
-MGFA class IIb.
-```
-
-## 📊 Day 3: 查看 Mock Data（使用 TablePlus）
-
-启动应用后，数据库已经有测试数据了。你可以用 TablePlus 查看：
-
-**连接信息：**
-- Host: `localhost`
-- Port: `5432`
-- User: `careplan_user`
-- Password: `careplan_password`
-- Database: `careplan`
-
-**查看已有数据：**
-- **3 个医生**（李医生、王医生、张医生）
-- **5 个病人**（张三、李四、王五、赵六、陈七）
-- **7 个订单**（包含不同状态的 Care Plans）
-  - ✅ COMPLETED (3个) - 已完成
-  - ⏳ PROCESSING (1个) - 处理中
-  - 🕐 PENDING (2个) - 等待中
-  - ❌ FAILED (1个) - 失败
-
-**试试这些 SQL 查询：**
-
-```sql
--- 查看所有订单
-SELECT 
-    p.first_name || ' ' || p.last_name as patient_name,
-    pr.name as provider_name,
-    o.medication_name,
-    cp.status
-FROM orders o
-JOIN patients p ON o.patient_id = p.id
-JOIN providers pr ON o.provider_id = pr.id
-LEFT JOIN care_plans cp ON cp.order_id = o.id;
-
--- 查看张三的所有订单（他有3个订单）
-SELECT 
-    o.medication_name,
-    cp.status
-FROM orders o
-JOIN patients p ON o.patient_id = p.id
-LEFT JOIN care_plans cp ON cp.order_id = o.id
-WHERE p.first_name = '张' AND p.last_name = '三';
-```
-
-**详细说明：** 查看 `backend/notes/DAY3/QUICKSTART.md`
-
-## 🔍 体验痛点
-
-提交表单后，你会发现：
-- ❌ 页面卡住了，什么都做不了
-- ❌ 不能提交第二个订单
-- ❌ 如果 LLM 调用失败，用户白等了
-- ❌ 用户体验很差
-
-**这就是为什么 Day 4 要引入消息队列！**
-
-## 🛠️ 技术栈
-
-- **后端**: Java 17, Spring Boot 3.4, Spring Data JPA
-- **数据库**: PostgreSQL 15
-- **前端**: 纯 HTML/CSS/JavaScript
-- **容器化**: Docker, Docker Compose
-- **LLM**: OpenAI GPT-3.5-turbo
-
-## 📊 数据库结构
-
-```
-patients (病人表)
-├── id
-├── first_name
-├── last_name
-├── mrn (唯一)
-└── date_of_birth
-
-providers (医生表)
-├── id
-├── name
-└── npi (唯一)
-
-orders (订单表)
-├── id
-├── patient_id (外键)
-├── provider_id (外键)
-├── medication_name
-├── primary_diagnosis
-├── additional_diagnosis
-├── medication_history
-├── patient_records
-└── created_at
-
-care_plans (护理计划表)
-├── id
-├── order_id (外键)
-├── status (PENDING/PROCESSING/COMPLETED/FAILED)
-├── content
-├── created_at
-└── updated_at
-```
-
-## 🐛 调试
-
-### 查看日志
-```bash
-docker-compose logs -f backend
-```
-
-### 查看数据库
-```bash
-docker exec -it careplan-postgres psql -U postgres -d careplan
-```
-
-常用 SQL：
-```sql
--- 查看所有表
-\dt
-
--- 查看订单
-SELECT * FROM orders;
-
--- 查看 care plans
-SELECT * FROM care_plans;
-
--- 查看患者
-SELECT * FROM patients;
-```
-
-## 🛑 停止服务
+Keep database data:
 
 ```bash
 docker-compose down
 ```
 
-保留数据：
-```bash
-docker-compose down
-```
+Remove database volumes and start fresh next time:
 
-删除所有数据（包括数据库）：
 ```bash
 docker-compose down -v
 ```
 
-## ⚠️ 注意事项
+## Local Database
 
-1. **API Key 安全**: 不要把 API Key 提交到 Git！`.env` 文件已经在 `.gitignore` 中
-2. **API 费用**: 每次调用 LLM 都会产生费用（大约 $0.002-0.01）
-3. **同步调用**: 这个版本是故意做成同步的，让你体验缺点
+PostgreSQL connection details from `docker-compose.yml`:
 
-## 📚 下一步学习
+- Host: `localhost`
+- Port: `5432`
+- Database: `careplan`
+- User: `careplan_user`
+- Password: `careplan_password`
 
-- **Day 3**: 数据库设计优化
-- **Day 4**: 引入消息队列（Redis）实现异步
-- **Day 5**: Celery Worker 处理任务
-- **Day 6**: 前端实时更新（Polling/WebSocket）
+Open a `psql` shell:
 
-## 🤔 思考问题
+```bash
+docker exec -it careplan-postgres psql -U careplan_user -d careplan
+```
 
-运行这个 MVP 后，思考：
-1. 如果 10 个用户同时提交，会发生什么？
-2. 如果 LLM API 调用失败，用户体验如何？
-3. 如果一个 care plan 需要 1 分钟生成，用户会怎么样？
+Useful queries:
 
-这些问题的答案，就是后续引入异步架构的原因！
+```sql
+SELECT * FROM patients;
+SELECT * FROM providers;
+SELECT * FROM orders;
+SELECT * FROM care_plans;
+```
 
+## Core Flow
+
+The current local flow is asynchronous:
+
+```text
+Frontend / API client
+  -> POST /api/orders
+  -> Spring Boot creates Patient / Provider / Order / CarePlan
+  -> CarePlan starts as PENDING
+  -> carePlanId is pushed into Redis
+  -> CarePlanWorker consumes one job every 5 seconds
+  -> CarePlanGenerationService calls the selected LLM provider
+  -> Success updates the CarePlan to COMPLETED
+  -> Retries are attempted on failure; exhausted retries mark it as FAILED
+  -> The frontend polls GET /api/orders/{id}/status
+```
+
+This maps to Days 4-6 in the course: introduce a queue, add a worker, then let the frontend observe task progress.
+
+## API
+
+### Create an order
+
+```http
+POST /api/orders
+Content-Type: application/json
+```
+
+Example request:
+
+```json
+{
+  "patientFirstName": "John",
+  "patientLastName": "Doe",
+  "patientMrn": "123456",
+  "patientDateOfBirth": "1980-01-01",
+  "providerName": "Dr. Smith",
+  "providerNpi": "1234567890",
+  "medicationName": "IVIG",
+  "primaryDiagnosis": "G70.00",
+  "additionalDiagnosis": "I10, K21.9",
+  "medicationHistory": "Pyridostigmine 60mg q6h PRN",
+  "patientRecords": "Progressive muscle weakness over 2 weeks."
+}
+```
+
+A successful request usually returns `201 Created`. The care plan status starts as `PENDING`, then moves through `PROCESSING`, `COMPLETED`, or `FAILED`.
+
+### Query orders and status
+
+```http
+GET /api/orders
+GET /api/orders/{id}
+GET /api/orders/{id}/status
+GET /api/orders/search?patientName=John
+GET /api/orders/search?mrn=123456
+```
+
+### Download a completed care plan
+
+```http
+GET /api/orders/{id}/download
+```
+
+Only `COMPLETED` care plans can be downloaded. Other statuses return a business error.
+
+### Multi-source intake APIs
+
+These endpoints demonstrate the Adapter Pattern. External payloads may have different shapes, but each adapter converts its source format into the internal order request model.
+
+```http
+POST /api/intake/clinic-b
+Content-Type: application/json
+```
+
+```http
+POST /api/intake/pharma-corp
+Content-Type: application/xml
+```
+
+```http
+POST /api/intake/hospital-d
+Content-Type: text/csv
+```
+
+If a duplicate medication order from a different day triggers a warning, the first request asks for confirmation. Submit again with:
+
+```http
+POST /api/intake/clinic-b?confirm=true
+```
+
+## Validation and Business Rules
+
+The backend currently enforces:
+
+- MRN must be exactly 6 digits
+- NPI must be exactly 10 digits
+- `primaryDiagnosis` must be a valid ICD-10-style code
+- `additionalDiagnosis` supports a comma-separated ICD-10-style list
+- Same NPI with a different provider name is an error
+- Same patient + same medication + same day is an error
+- Same patient + same medication + different day is a warning and requires `confirm=true`
+- LLM failures are retried; exhausted retries mark the care plan as `FAILED`
+- API errors use a unified JSON format and do not expose stack traces
+
+Interview note: a useful explanation for the warning behavior is that same-day duplicates are likely accidental, so they should be blocked. Cross-day duplicates may represent refills or another therapy cycle, so the user is asked to confirm.
+
+## Tests
+
+Run tests locally:
+
+```bash
+./mvnw test
+```
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Run tests inside Docker:
+
+```bash
+docker-compose run --rm backend-test
+```
+
+Tests use an H2 in-memory database and `LLM_MOCK_ENABLED=true`, so they do not require a real LLM API.
+
+## Monitoring
+
+Spring Boot Actuator exposes Prometheus metrics at:
+
+```text
+http://localhost:8080/actuator/prometheus
+```
+
+Docker Compose also starts:
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+Prometheus configuration:
+
+```text
+notes/Day11_Monitoring/prometheus.yml
+```
+
+## AWS Practice Code
+
+The repository includes AWS Lambda/SQS practice classes:
+
+- `CreateOrderHandler`
+- `GetOrderHandler`
+- `SqsCarePlanQueue`
+- `LambdaSpringContext`
+- `LambdaApplication`
+
+Packaging config:
+
+```text
+src/assembly/aws-lambda.xml
+```
+
+Build package:
+
+```bash
+./mvnw package
+```
+
+AWS deployment is not required for local development. In the course plan, AWS appears in Days 12-15: first using the AWS Console manually, then connecting API Gateway, Lambda, SQS, and RDS, and finally automating infrastructure with Terraform.
+
+## Course Map
+
+| Day | Topic | Java/Spring Boot implementation |
+|---|---|---|
+| 1 | Requirements + design doc | `docs/` |
+| 2 | Synchronous MVP | Spring Controller + Service + LLM |
+| 3 | Database design | JPA Entity + Repository + PostgreSQL |
+| 4 | Message queue | Redis queue |
+| 5 | Worker | Scheduled worker + Spring Retry |
+| 6 | Frontend status updates | Polling API |
+| 7 | Code refactor | Controller-Service-Repository layering |
+| 8 | Errors, warnings, tests | Validation, unified errors, JUnit |
+| 9-10 | Adapter Pattern | Multi-source adapters under `intake/` |
+| 11 | Monitoring | Actuator + Prometheus + Grafana |
+| 12-15 | AWS / SQS / Terraform | Lambda/SQS code and later infra work |
+| 16 | RESTful API practice | Independent CRUD practice |
+
+## Common Questions
+
+### Why is the care plan not completed immediately after creating an order?
+
+The current version uses async processing. `POST /api/orders` creates the order and queues a job. A background worker generates the care plan later. Clients should poll `GET /api/orders/{id}/status`.
+
+### Why use a mock LLM during development?
+
+The mock provider avoids API keys, API costs, and network instability while you are still validating the core workflow. Once the business flow works, you can switch to OpenAI or Claude.
+
+### Why not use WebSocket yet?
+
+Polling is intentionally introduced first because it is simpler and easier to reason about. WebSocket adds connection management, reconnect behavior, and scaling concerns. Those are valuable topics, but they make more sense after the polling version is working.
+
+## Good Files to Read Next
+
+- `docs/project-instructions.md`: original project requirements and learning goals
+- `notes/`: day-by-day notes and stage explanations
+- `src/test/java/com/page24/backend`: tests that describe expected behavior
