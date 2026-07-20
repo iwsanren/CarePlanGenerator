@@ -2,6 +2,7 @@ package com.page24.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,9 +15,10 @@ import org.springframework.stereotype.Service;
  * 3. 处理任务的部分（Worker）是 Day 5 的内容
  */
 @Service
+@Profile("!lambda")
 @RequiredArgsConstructor
 @Slf4j
-public class QueueService {
+public class QueueService implements CarePlanQueue {
 
     private final RedisTemplate<String, Object> redisTemplate;
 

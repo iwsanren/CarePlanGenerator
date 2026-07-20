@@ -11,6 +11,7 @@ import com.page24.backend.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.time.LocalDate;
  * 这个服务在应用启动时自动运行，向数据库插入测试数据
  */
 @Service
+@Profile("!lambda")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializationService implements CommandLineRunner {
