@@ -1,6 +1,7 @@
 package com.page24.backend.aws.lambda;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.retry.annotation.EnableRetry;
 
 /**
  * Lambda-specific Spring entrypoint.
@@ -8,5 +9,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * local-only scheduling such as CarePlanWorker polling Redis.
  */
 @SpringBootApplication(scanBasePackages = "com.page24.backend")
+@EnableRetry
 public class LambdaApplication {
 }
