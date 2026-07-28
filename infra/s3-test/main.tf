@@ -15,7 +15,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "test_bucket" {
-  bucket        = "my-test-bucket-12345"
+  bucket        = "careplan-test-bucket-hehe-eu-west-1-20260728"
   force_destroy = true
 
   tags = {
