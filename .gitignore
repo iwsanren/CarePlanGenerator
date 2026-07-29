@@ -8,3 +8,9 @@ notes/
 **/terraform.tfstate.backup
 **/*.tfvars
 !**/*.tfvars.example
+
+# instructions
+AGENTS.md
+
+# docs
+docs/

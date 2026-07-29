@@ -36,11 +36,4 @@ target/
 *.swp
 
 # notes
-notes/
 startBat/
-
-# instructions
-AGENTS.md
-
-# docs
-docs
