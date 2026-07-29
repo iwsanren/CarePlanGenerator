@@ -1,3 +1,4 @@
 backend/.github/
 backend/.idea/
 infra/**/.terraform/
+notes/
