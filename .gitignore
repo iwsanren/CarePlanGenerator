@@ -6,6 +6,7 @@ notes/
 **/.terraform/
 **/terraform.tfstate
 **/terraform.tfstate.backup
+**/.terraform.tfstate.lock.info
 **/*.tfvars
 !**/*.tfvars.example
 
@@ -14,3 +15,5 @@ AGENTS.md
 
 # docs
 docs/
+
+reference/
