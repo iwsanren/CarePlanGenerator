@@ -3,6 +3,7 @@ package com.page24.backend.service;
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderMapper;
 import com.page24.backend.dto.OrderResponse;
+import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.entity.*;
 import com.page24.backend.exception.BlockError;
 import com.page24.backend.exception.ValidationError;
@@ -10,6 +11,9 @@ import com.page24.backend.exception.WarningException;
 import com.page24.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -201,18 +206,31 @@ public class OrderService {
     }
 
     /**
-     * 查询所有订单
-     *
-     * 原来在 OrderController 第 99-109 行的 getAllOrders() 方法体
+     * Query orders with pagination and optional filters by CarePlan status and patient name.
      */
-    public List<OrderResponse> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        return orders.stream()
-                .map(order -> {
-                    CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
-                    return orderMapper.toResponse(order, carePlan);
-                })
+    public PagedOrderResponse getOrders(int page, int pageSize, String status, String patientName) {
+        if (page < 1) {
+            throw new ValidationError("INVALID_PAGE", "page must be greater than or equal to 1");
+        }
+        if (pageSize < 1) {
+            throw new ValidationError("INVALID_PAGE_SIZE", "page_size must be greater than or equal to 1");
+        }
+
+        CarePlan.Status statusFilter = parseStatus(status);
+        String patientNamePattern = buildPatientNamePattern(patientName);
+
+        PageRequest pageRequest = PageRequest.of(
+                page - 1,
+                pageSize,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+
+        Page<Order> orders = findOrdersPage(statusFilter, patientNamePattern, pageRequest);
+        List<OrderResponse> results = orders.getContent().stream()
+                .map(this::toOrderResponse)
                 .collect(Collectors.toList());
+
+        return new PagedOrderResponse(orders.getTotalElements(), page, pageSize, results);
     }
 
     /**
@@ -245,11 +263,61 @@ public class OrderService {
         }
 
         return orders.stream()
-                .map(order -> {
-                    CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
-                    return orderMapper.toResponse(order, carePlan);
-                })
+                .map(this::toOrderResponse)
                 .collect(Collectors.toList());
+    }
+
+    private OrderResponse toOrderResponse(Order order) {
+        CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
+        return orderMapper.toResponse(order, carePlan);
+    }
+
+    private Page<Order> findOrdersPage(
+            CarePlan.Status statusFilter,
+            String patientNamePattern,
+            PageRequest pageRequest
+    ) {
+        if (statusFilter != null && patientNamePattern != null) {
+            return orderRepository.findByCarePlanStatusAndPatientName(statusFilter, patientNamePattern, pageRequest);
+        }
+        if (statusFilter != null) {
+            return orderRepository.findByCarePlanStatus(statusFilter, pageRequest);
+        }
+        if (patientNamePattern != null) {
+            return orderRepository.findByPatientName(patientNamePattern, pageRequest);
+        }
+        return orderRepository.findAll(pageRequest);
+    }
+
+    private CarePlan.Status parseStatus(String status) {
+        String normalized = normalizeBlankToNull(status);
+        if (normalized == null) {
+            return null;
+        }
+
+        try {
+            return CarePlan.Status.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationError(
+                    "INVALID_STATUS",
+                    "status must be one of: pending, processing, completed, failed"
+            );
+        }
+    }
+
+    private String buildPatientNamePattern(String patientName) {
+        String normalized = normalizeBlankToNull(patientName);
+        if (normalized == null) {
+            return null;
+        }
+        return "%" + normalized.toLowerCase(Locale.ROOT) + "%";
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 
     /**

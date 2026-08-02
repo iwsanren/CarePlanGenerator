@@ -122,7 +122,7 @@ On first startup, the application inserts mock data automatically. If the databa
 Keep database data:
 
 ```bash
-docker-compose down
+docker compose up --build
 ```
 
 Remove database volumes and start fresh next time:

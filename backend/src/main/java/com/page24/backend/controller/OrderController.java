@@ -2,6 +2,7 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderResponse;
+import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,9 +48,13 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
-    @GetMapping
-    public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    @GetMapping({"", "/"})
+    public ResponseEntity<PagedOrderResponse> getOrders(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String status,
+            @RequestParam(name = "patient_name", required = false) String patientName) {
+        return ResponseEntity.ok(orderService.getOrders(page, pageSize, status, patientName));
     }
 
     @GetMapping("/search")
