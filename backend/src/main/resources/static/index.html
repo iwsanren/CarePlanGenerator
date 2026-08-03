@@ -424,7 +424,8 @@
         async function loadOrders() {
             try {
                 const response = await fetch(API_BASE_URL);
-                const orders = await response.json();
+                const data = await response.json();
+                const orders = normalizeOrdersResponse(data);
                 displayOrders(orders);
             } catch (error) {
                 console.error('Error loading orders:', error);
@@ -449,7 +450,8 @@
                 }
 
                 const response = await fetch(url);
-                const orders = await response.json();
+                const data = await response.json();
+                const orders = normalizeOrdersResponse(data);
                 displayOrders(orders);
 
                 if (orders.length === 0) {
@@ -459,6 +461,19 @@
                 console.error('Error searching orders:', error);
                 alert('Error searching orders: ' + error.message);
             }
+        }
+
+        function normalizeOrdersResponse(data) {
+            if (Array.isArray(data)) {
+                return data;
+            }
+
+            if (data && Array.isArray(data.results)) {
+                return data.results;
+            }
+
+            console.error('Unexpected orders response:', data);
+            return [];
         }
 
         function displayOrders(orders) {
