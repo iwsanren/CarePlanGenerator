@@ -1,0 +1,75 @@
+package com.page24.backend.controller;
+
+import com.page24.backend.dto.CreatePatientRequest;
+import com.page24.backend.dto.PatientResponse;
+import com.page24.backend.exception.PatientDuplicateException;
+import com.page24.backend.service.PatientService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+@RequiredArgsConstructor
+public class PatientController {
+
+    private final PatientService patientService;
+
+    @PostMapping("/patients")
+    public ResponseEntity<PatientResponse> createPatient(@Valid @RequestBody CreatePatientRequest request) {
+        PatientResponse response = patientService.createPatient(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationError(MethodArgumentNotValidException ex) {
+        Map<String, String> details = new LinkedHashMap<>();
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            details.put(toApiFieldName(fieldError.getField()), fieldError.getDefaultMessage());
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Validation failed");
+        body.put("details", details);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("body", "Malformed or unreadable JSON request body");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Validation failed");
+        body.put("details", details);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(PatientDuplicateException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicatePatient(PatientDuplicateException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("warning", ex.getWarning());
+        body.put("existing_patient_id", ex.getExistingPatientId());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    private String toApiFieldName(String fieldName) {
+        String normalized = fieldName.replace("dateOfBirth", "date_of_birth")
+                .replace("weightKg", "weight_kg")
+                .replace("primaryDiagnosis", "primary_diagnosis")
+                .replace("additionalDiagnoses", "additional_diagnoses")
+                .replace("firstName", "first_name")
+                .replace("lastName", "last_name");
+        return normalized;
+    }
+}
