@@ -50,6 +50,12 @@ public class PatientExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    @ExceptionHandler(PatientNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handlePatientNotFound(PatientNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
     private String toApiFieldName(String fieldName) {
         return fieldName.replace("dateOfBirth", "date_of_birth")
                 .replace("weightKg", "weight_kg")

@@ -2,15 +2,27 @@ package com.page24.backend.service;
 
 import com.page24.backend.dto.CreatePatientRequest;
 import com.page24.backend.dto.PatientMapper;
+import com.page24.backend.dto.PatientDetailMapper;
+import com.page24.backend.dto.PatientDetailResponse;
+import com.page24.backend.entity.CarePlan;
+import com.page24.backend.entity.Order;
 import com.page24.backend.dto.PatientResponse;
 import com.page24.backend.entity.Patient;
 import com.page24.backend.exception.PatientDuplicateException;
+import com.page24.backend.exception.PatientNotFoundException;
+import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.repository.OrderRepository;
 import com.page24.backend.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +30,9 @@ public class PatientService {
 
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
+    private final OrderRepository orderRepository;
+    private final CarePlanRepository carePlanRepository;
+    private final PatientDetailMapper patientDetailMapper;
 
     @Transactional
     public PatientResponse createPatient(CreatePatientRequest request) {
@@ -58,5 +73,34 @@ public class PatientService {
 
         Patient savedPatient = patientRepository.save(patient);
         return patientMapper.toResponse(savedPatient);
+    }
+
+    @Transactional(readOnly = true)
+    public PatientDetailResponse getPatientById(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(PatientNotFoundException::new);
+
+        List<Order> orders = orderRepository.findByPatient(patient).stream()
+                .sorted(Comparator.comparing(Order::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        Map<Long, CarePlan> carePlansByOrderId = orders.isEmpty()
+                ? Map.of()
+                : carePlanRepository.findByOrderIn(orders).stream()
+                        .collect(Collectors.toMap(carePlan -> carePlan.getOrder().getId(), carePlan -> carePlan));
+
+        List<String> medicationHistory = orders.stream()
+                .map(Order::getMedicationHistory)
+                .filter(history -> history != null && !history.isBlank())
+                .flatMap(history -> history.lines())
+                .map(String::trim)
+                .filter(history -> !history.isEmpty())
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toCollection(LinkedHashSet::new),
+                        ArrayList::new
+                ));
+
+        return patientDetailMapper.toResponse(patient, medicationHistory, orders, carePlansByOrderId);
     }
 }
