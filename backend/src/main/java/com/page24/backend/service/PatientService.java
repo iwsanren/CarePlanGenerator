@@ -4,18 +4,23 @@ import com.page24.backend.dto.CreatePatientRequest;
 import com.page24.backend.dto.PatientMapper;
 import com.page24.backend.dto.PatientDetailMapper;
 import com.page24.backend.dto.PatientDetailResponse;
+import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
 import com.page24.backend.dto.PatientResponse;
 import com.page24.backend.entity.Patient;
 import com.page24.backend.exception.PatientDuplicateException;
 import com.page24.backend.exception.PatientNotFoundException;
+import com.page24.backend.exception.ValidationError;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
 import com.page24.backend.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -76,6 +81,37 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
+    public PagedPatientResponse getPatients(int page, int pageSize, String search) {
+        if (page < 1) {
+            throw new ValidationError("INVALID_PAGE", "page must be greater than or equal to 1");
+        }
+        if (pageSize < 1) {
+            throw new ValidationError("INVALID_PAGE_SIZE", "page_size must be greater than or equal to 1");
+        }
+
+        PageRequest pageRequest = PageRequest.of(
+                page - 1,
+                pageSize,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+        String normalizedSearch = normalizeBlankToNull(search);
+        Page<Patient> patients = normalizedSearch == null
+                ? patientRepository.findAll(pageRequest)
+                : patientRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+                        normalizedSearch,
+                        normalizedSearch,
+                        pageRequest
+                );
+
+        return new PagedPatientResponse(
+                patients.getTotalElements(),
+                page,
+                pageSize,
+                patients.getContent().stream().map(patientMapper::toListItemResponse).toList()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public PatientDetailResponse getPatientById(Long id) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(PatientNotFoundException::new);
@@ -102,5 +138,12 @@ public class PatientService {
                 ));
 
         return patientDetailMapper.toResponse(patient, medicationHistory, orders, carePlansByOrderId);
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 }

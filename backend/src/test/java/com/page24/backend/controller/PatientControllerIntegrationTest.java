@@ -190,6 +190,79 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1));
     }
 
+    @Test
+    @DisplayName("GET /patients - returns a paginated summary response")
+    void shouldGetPatientsWithPagination() throws Exception {
+        createPatient("John", "Smith", "001234");
+        createPatient("Jane", "Smith", "001235");
+        createPatient("Alex", "Jones", "001236");
+
+        mockMvc.perform(get("/patients")
+                        .param("page", "1")
+                        .param("page_size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(3))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.page_size").value(2))
+                .andExpect(jsonPath("$.results.length()").value(2))
+                .andExpect(jsonPath("$.results[0].id").exists())
+                .andExpect(jsonPath("$.results[0].first_name").exists())
+                .andExpect(jsonPath("$.results[0].mrn").exists())
+                .andExpect(jsonPath("$.results[0].primary_diagnosis").value("G70.00"))
+                .andExpect(jsonPath("$.results[0].created_at").exists())
+                .andExpect(jsonPath("$.results[0].date_of_birth").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /patients - searches first and last name without case sensitivity")
+    void shouldSearchPatientsByName() throws Exception {
+        createPatient("John", "Smith", "001234");
+        createPatient("Jane", "Adams", "001235");
+
+        mockMvc.perform(get("/patients").param("search", "sMi"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].first_name").value("John"))
+                .andExpect(jsonPath("$.results[0].last_name").value("Smith"));
+    }
+
+    @Test
+    @DisplayName("GET /patients - returns an empty page when no patient matches search")
+    void shouldReturnEmptyPageForNoSearchMatches() throws Exception {
+        createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(get("/patients").param("search", "NotFound"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.page_size").value(20))
+                .andExpect(jsonPath("$.results.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /patients - rejects invalid pagination values")
+    void shouldRejectInvalidPaginationValues() throws Exception {
+        mockMvc.perform(get("/patients").param("page", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PAGE"));
+
+        mockMvc.perform(get("/patients").param("page_size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
+    }
+
+    private Patient createPatient(String firstName, String lastName, String mrn) {
+        Patient patient = new Patient();
+        patient.setFirstName(firstName);
+        patient.setLastName(lastName);
+        patient.setMrn(mrn);
+        patient.setDateOfBirth(LocalDate.of(1979, 6, 8));
+        patient.setPrimaryDiagnosis("G70.00");
+        patient.setAdditionalDiagnoses(new ArrayList<>());
+        return patientRepository.save(patient);
+    }
+
     private String validRequestJson(String mrn) {
         return requestJson(mrn, 72);
     }

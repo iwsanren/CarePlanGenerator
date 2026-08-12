@@ -1,6 +1,8 @@
 package com.page24.backend.repository;
 
 import com.page24.backend.entity.Patient;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,5 +18,10 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
             java.time.LocalDate dateOfBirth
     );
     List<Patient> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(String firstName, String lastName);
+    Page<Patient> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+            String firstName,
+            String lastName,
+            Pageable pageable
+    );
 }
 

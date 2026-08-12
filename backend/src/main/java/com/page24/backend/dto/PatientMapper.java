@@ -27,4 +27,19 @@ public class PatientMapper {
 
         return response;
     }
+
+    public PatientListItemResponse toListItemResponse(Patient patient) {
+        PatientListItemResponse response = new PatientListItemResponse();
+        response.setId(patient.getId());
+        response.setFirstName(patient.getFirstName());
+        response.setLastName(patient.getLastName());
+        response.setMrn(patient.getMrn());
+        response.setPrimaryDiagnosis(patient.getPrimaryDiagnosis());
+
+        if (patient.getCreatedAt() != null) {
+            response.setCreatedAt(patient.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant());
+        }
+
+        return response;
+    }
 }
