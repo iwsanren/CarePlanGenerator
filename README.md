@@ -301,7 +301,7 @@ Docker Compose also starts:
 Prometheus configuration:
 
 ```text
-notes/Day11_Monitoring/prometheus.yml
+resources/prometheus/prometheus.yml
 ```
 
 ## AWS Practice Code
