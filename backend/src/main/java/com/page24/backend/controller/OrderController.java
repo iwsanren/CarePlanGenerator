@@ -53,8 +53,11 @@ public class OrderController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
             @RequestParam(required = false) String status,
+            @RequestParam(name = "patient_id", required = false) Long patientId,
+            @RequestParam(name = "provider_id", required = false) Long providerId,
             @RequestParam(name = "patient_name", required = false) String patientName) {
-        return ResponseEntity.ok(orderService.getOrders(page, pageSize, status, patientName));
+        return ResponseEntity.ok(orderService.getOrders(
+                page, pageSize, status, patientId, providerId, patientName));
     }
 
     @GetMapping("/search")

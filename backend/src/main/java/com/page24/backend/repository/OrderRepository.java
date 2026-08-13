@@ -18,44 +18,38 @@ import java.time.LocalDateTime;
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByPatient(Patient patient);
 
-    @Query("""
-            select o
-            from Order o
-            join CarePlan cp on cp.order = o
-            where cp.status = :status
-            """)
-    Page<Order> findByCarePlanStatus(
-            @Param("status") CarePlan.Status status,
-            Pageable pageable
-    );
-
-    @Query("""
-            select o
-            from Order o
-            join o.patient p
-            where lower(p.firstName) like :patientNamePattern
-               or lower(p.lastName) like :patientNamePattern
-               or lower(concat(concat(p.firstName, ' '), p.lastName)) like :patientNamePattern
-            """)
-    Page<Order> findByPatientName(
-            @Param("patientNamePattern") String patientNamePattern,
-            Pageable pageable
-    );
-
-    @Query("""
+    @Query(value = """
             select o
             from Order o
             join o.patient p
             join CarePlan cp on cp.order = o
-            where cp.status = :status
-              and (
+            where (:status is null or cp.status = :status)
+              and (:patientId is null or p.id = :patientId)
+              and (:providerId is null or o.provider.id = :providerId)
+              and (:patientNamePattern is null or (
                 lower(p.firstName) like :patientNamePattern
                 or lower(p.lastName) like :patientNamePattern
                 or lower(concat(concat(p.firstName, ' '), p.lastName)) like :patientNamePattern
-              )
+              ))
+            """,
+            countQuery = """
+            select count(o)
+            from Order o
+            join o.patient p
+            join CarePlan cp on cp.order = o
+            where (:status is null or cp.status = :status)
+              and (:patientId is null or p.id = :patientId)
+              and (:providerId is null or o.provider.id = :providerId)
+              and (:patientNamePattern is null or (
+                lower(p.firstName) like :patientNamePattern
+                or lower(p.lastName) like :patientNamePattern
+                or lower(concat(concat(p.firstName, ' '), p.lastName)) like :patientNamePattern
+              ))
             """)
-    Page<Order> findByCarePlanStatusAndPatientName(
+    Page<Order> findByFilters(
             @Param("status") CarePlan.Status status,
+            @Param("patientId") Long patientId,
+            @Param("providerId") Long providerId,
             @Param("patientNamePattern") String patientNamePattern,
             Pageable pageable
     );

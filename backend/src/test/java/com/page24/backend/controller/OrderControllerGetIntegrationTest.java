@@ -94,7 +94,7 @@ class OrderControllerGetIntegrationTest {
                         .param("status", "completed"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.results[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.results[0].status").value("completed"));
     }
 
     @Test
@@ -107,7 +107,7 @@ class OrderControllerGetIntegrationTest {
                         .param("patient_name", "张"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.results[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.results[0].status").value("completed"));
     }
 
     @Test
@@ -122,7 +122,41 @@ class OrderControllerGetIntegrationTest {
                         .param("patient_name", "张"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.results[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.results[0].status").value("completed"));
+    }
+
+    @Test
+    @DisplayName("GET /api/orders - combines status, patient_id, and provider_id filters")
+    void shouldFilterByStatusPatientAndProvider() throws Exception {
+        Patient matchingPatient = createPatient("Alice", "Wong", "100001");
+        Patient otherPatient = createPatient("Bob", "Lee", "100002");
+        Provider otherProvider = new Provider();
+        otherProvider.setName("Dr. Blue");
+        otherProvider.setNpi("2222222222");
+        otherProvider = providerRepository.save(otherProvider);
+
+        createOrder(matchingPatient, provider, CarePlan.Status.PENDING);
+        createOrder(matchingPatient, otherProvider, CarePlan.Status.PENDING);
+        createOrder(otherPatient, provider, CarePlan.Status.COMPLETED);
+
+        mockMvc.perform(get("/api/orders")
+                        .param("status", "pending")
+                        .param("patient_id", matchingPatient.getId().toString())
+                        .param("provider_id", provider.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.results[0].patient_name").value("Alice Wong"))
+                .andExpect(jsonPath("$.results[0].medication_name").value("IVIG"))
+                .andExpect(jsonPath("$.results[0].status").value("pending"))
+                .andExpect(jsonPath("$.results[0].created_at").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/orders - rejects non-positive patient_id")
+    void shouldRejectNonPositivePatientId() throws Exception {
+        mockMvc.perform(get("/api/orders").param("patient_id", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PATIENT_ID"));
     }
 
     @Test
@@ -142,9 +176,22 @@ class OrderControllerGetIntegrationTest {
         patient.setDateOfBirth(LocalDate.of(1990, 1, 1));
         patient = patientRepository.save(patient);
 
+        createOrder(patient, provider, status);
+    }
+
+    private Patient createPatient(String firstName, String lastName, String mrn) {
+        Patient patient = new Patient();
+        patient.setFirstName(firstName);
+        patient.setLastName(lastName);
+        patient.setMrn(mrn);
+        patient.setDateOfBirth(LocalDate.of(1990, 1, 1));
+        return patientRepository.save(patient);
+    }
+
+    private void createOrder(Patient patient, Provider orderProvider, CarePlan.Status status) {
         Order order = new Order();
         order.setPatient(patient);
-        order.setProvider(provider);
+        order.setProvider(orderProvider);
         order.setMedicationName("IVIG");
         order.setPrimaryDiagnosis("G70.00");
         order.setAdditionalDiagnosis("I10");

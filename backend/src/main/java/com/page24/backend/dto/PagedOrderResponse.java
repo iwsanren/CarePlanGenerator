@@ -21,5 +21,5 @@ public class PagedOrderResponse {
     @JsonProperty("page_size")
     private int pageSize;
 
-    private List<OrderResponse> results;
+    private List<OrderListItemResponse> results;
 }

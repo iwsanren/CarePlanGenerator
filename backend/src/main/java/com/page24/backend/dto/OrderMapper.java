@@ -4,6 +4,9 @@ import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneOffset;
+import java.util.Locale;
+
 /**
  * OrderMapper - 数据格式转换
  *
@@ -43,6 +46,23 @@ public class OrderMapper {
         }
 
         return response;
+    }
+
+    /** Maps an order to the smaller shape required by GET /api/orders. */
+    public OrderListItemResponse toListItemResponse(Order order, CarePlan carePlan) {
+        String patientName = String.format("%s %s",
+                order.getPatient().getFirstName(), order.getPatient().getLastName()).trim();
+        String status = carePlan == null
+                ? "pending"
+                : carePlan.getStatus().name().toLowerCase(Locale.ROOT);
+
+        return new OrderListItemResponse(
+                order.getId(),
+                patientName,
+                order.getMedicationName(),
+                status,
+                order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant()
+        );
     }
 }
 

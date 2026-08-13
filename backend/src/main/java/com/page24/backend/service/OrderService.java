@@ -2,6 +2,7 @@ package com.page24.backend.service;
 
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderMapper;
+import com.page24.backend.dto.OrderListItemResponse;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.entity.*;
@@ -205,16 +206,23 @@ public class OrderService {
         return orderMapper.toResponse(order, carePlan);
     }
 
-    /**
-     * Query orders with pagination and optional filters by CarePlan status and patient name.
-     */
-    public PagedOrderResponse getOrders(int page, int pageSize, String status, String patientName) {
+    /** Query orders with pagination and optional filters, which can be combined. */
+    public PagedOrderResponse getOrders(
+            int page,
+            int pageSize,
+            String status,
+            Long patientId,
+            Long providerId,
+            String patientName
+    ) {
         if (page < 1) {
             throw new ValidationError("INVALID_PAGE", "page must be greater than or equal to 1");
         }
         if (pageSize < 1) {
             throw new ValidationError("INVALID_PAGE_SIZE", "page_size must be greater than or equal to 1");
         }
+        validatePositiveId(patientId, "patient_id", "INVALID_PATIENT_ID");
+        validatePositiveId(providerId, "provider_id", "INVALID_PROVIDER_ID");
 
         CarePlan.Status statusFilter = parseStatus(status);
         String patientNamePattern = buildPatientNamePattern(patientName);
@@ -225,9 +233,10 @@ public class OrderService {
                 Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
         );
 
-        Page<Order> orders = findOrdersPage(statusFilter, patientNamePattern, pageRequest);
-        List<OrderResponse> results = orders.getContent().stream()
-                .map(this::toOrderResponse)
+        Page<Order> orders = orderRepository.findByFilters(
+                statusFilter, patientId, providerId, patientNamePattern, pageRequest);
+        List<OrderListItemResponse> results = orders.getContent().stream()
+                .map(this::toListItemResponse)
                 .collect(Collectors.toList());
 
         return new PagedOrderResponse(orders.getTotalElements(), page, pageSize, results);
@@ -272,21 +281,15 @@ public class OrderService {
         return orderMapper.toResponse(order, carePlan);
     }
 
-    private Page<Order> findOrdersPage(
-            CarePlan.Status statusFilter,
-            String patientNamePattern,
-            PageRequest pageRequest
-    ) {
-        if (statusFilter != null && patientNamePattern != null) {
-            return orderRepository.findByCarePlanStatusAndPatientName(statusFilter, patientNamePattern, pageRequest);
+    private OrderListItemResponse toListItemResponse(Order order) {
+        CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
+        return orderMapper.toListItemResponse(order, carePlan);
+    }
+
+    private void validatePositiveId(Long id, String parameterName, String errorCode) {
+        if (id != null && id < 1) {
+            throw new ValidationError(errorCode, parameterName + " must be greater than or equal to 1");
         }
-        if (statusFilter != null) {
-            return orderRepository.findByCarePlanStatus(statusFilter, pageRequest);
-        }
-        if (patientNamePattern != null) {
-            return orderRepository.findByPatientName(patientNamePattern, pageRequest);
-        }
-        return orderRepository.findAll(pageRequest);
     }
 
     private CarePlan.Status parseStatus(String status) {
