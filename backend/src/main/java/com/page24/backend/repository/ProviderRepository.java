@@ -9,5 +9,7 @@ import java.util.Optional;
 @Repository
 public interface ProviderRepository extends JpaRepository<Provider, Long> {
     Optional<Provider> findByNpi(String npi);
+
+    Optional<Provider> findFirstByNameIgnoreCase(String name);
 }
 
