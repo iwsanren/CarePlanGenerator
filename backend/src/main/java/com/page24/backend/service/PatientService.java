@@ -8,9 +8,12 @@ import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
 import com.page24.backend.dto.PatientResponse;
+import com.page24.backend.dto.UpdatePatientRequest;
+import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.entity.Patient;
 import com.page24.backend.exception.PatientDuplicateException;
 import com.page24.backend.exception.PatientNotFoundException;
+import com.page24.backend.exception.PatientMrnModificationException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
@@ -109,6 +112,44 @@ public class PatientService {
                 pageSize,
                 patients.getContent().stream().map(patientMapper::toListItemResponse).toList()
         );
+    }
+
+    @Transactional
+    public UpdatePatientResponse updatePatient(Long id, UpdatePatientRequest request) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(PatientNotFoundException::new);
+
+        if (request.isMrnProvided()) {
+            throw new PatientMrnModificationException();
+        }
+
+        if (request.getFirstName() != null) {
+            patient.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            patient.setLastName(request.getLastName());
+        }
+        if (request.getDateOfBirth() != null) {
+            patient.setDateOfBirth(request.getDateOfBirth());
+        }
+        if (request.getSex() != null) {
+            patient.setSex(request.getSex());
+        }
+        if (request.getWeightKg() != null) {
+            patient.setWeightKg(request.getWeightKg());
+        }
+        if (request.getAllergies() != null) {
+            patient.setAllergies(request.getAllergies());
+        }
+        if (request.getPrimaryDiagnosis() != null) {
+            patient.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
+        }
+        if (request.getAdditionalDiagnoses() != null) {
+            patient.setAdditionalDiagnoses(new ArrayList<>(request.getAdditionalDiagnoses()));
+        }
+
+        Patient updatedPatient = patientRepository.saveAndFlush(patient);
+        return patientMapper.toUpdateResponse(updatedPatient);
     }
 
     @Transactional(readOnly = true)

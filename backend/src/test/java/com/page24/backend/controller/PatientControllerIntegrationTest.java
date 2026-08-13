@@ -27,6 +27,7 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -250,6 +251,84 @@ class PatientControllerIntegrationTest {
         mockMvc.perform(get("/patients").param("page_size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
+    }
+
+    @Test
+    @DisplayName("PUT /patients/{id} - partially updates patient and returns updated_at")
+    void shouldUpdatePatient() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+        patient.setWeightKg(72.0);
+        patient.setAllergies("None known");
+        patient = patientRepository.saveAndFlush(patient);
+
+        mockMvc.perform(put("/patients/{id}", patient.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "weight_kg": 75,
+                                  "allergies": "Penicillin"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(patient.getId()))
+                .andExpect(jsonPath("$.first_name").value("John"))
+                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.mrn").value("001234"))
+                .andExpect(jsonPath("$.weight_kg").value(75.0))
+                .andExpect(jsonPath("$.allergies").value("Penicillin"))
+                .andExpect(jsonPath("$.updated_at").exists());
+
+        Patient reloadedPatient = patientRepository.findById(patient.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(1979, 6, 8), reloadedPatient.getDateOfBirth());
+        org.junit.jupiter.api.Assertions.assertEquals("G70.00", reloadedPatient.getPrimaryDiagnosis());
+    }
+
+    @Test
+    @DisplayName("PUT /patients/{id} - rejects invalid weight")
+    void shouldRejectInvalidUpdateWeight() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(put("/patients/{id}", patient.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"weight_kg\": 0 }"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.details.weight_kg").value("weight_kg must be greater than 0"));
+    }
+
+    @Test
+    @DisplayName("PUT /patients/{id} - rejects requests containing MRN")
+    void shouldRejectMrnModification() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(put("/patients/{id}", patient.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"mrn\": \"009999\" }"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.details.mrn").value("MRN cannot be modified"));
+    }
+
+    @Test
+    @DisplayName("PUT /patients/{id} - rejects MRN even when its value is null")
+    void shouldRejectNullMrnModification() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(put("/patients/{id}", patient.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"mrn\": null }"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.mrn").value("MRN cannot be modified"));
+    }
+
+    @Test
+    @DisplayName("PUT /patients/{id} - returns 404 for unknown patient")
+    void shouldReturnNotFoundWhenUpdatingUnknownPatient() throws Exception {
+        mockMvc.perform(put("/patients/{id}", 99999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"weight_kg\": 75 }"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Patient not found"));
     }
 
     private Patient createPatient(String firstName, String lastName, String mrn) {

@@ -56,6 +56,14 @@ public class PatientExceptionHandler {
                 .body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(PatientMrnModificationException.class)
+    public ResponseEntity<Map<String, Object>> handleMrnModification(PatientMrnModificationException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Validation failed");
+        body.put("details", Map.of("mrn", ex.getMessage()));
+        return ResponseEntity.badRequest().body(body);
+    }
+
     private String toApiFieldName(String fieldName) {
         return fieldName.replace("dateOfBirth", "date_of_birth")
                 .replace("weightKg", "weight_kg")

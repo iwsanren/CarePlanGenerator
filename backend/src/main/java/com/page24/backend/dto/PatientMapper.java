@@ -42,4 +42,20 @@ public class PatientMapper {
 
         return response;
     }
+
+    public UpdatePatientResponse toUpdateResponse(Patient patient) {
+        UpdatePatientResponse response = new UpdatePatientResponse();
+        response.setId(patient.getId());
+        response.setFirstName(patient.getFirstName());
+        response.setLastName(patient.getLastName());
+        response.setMrn(patient.getMrn());
+        response.setWeightKg(patient.getWeightKg());
+        response.setAllergies(patient.getAllergies());
+
+        if (patient.getUpdatedAt() != null) {
+            response.setUpdatedAt(patient.getUpdatedAt().atOffset(ZoneOffset.UTC).toInstant());
+        }
+
+        return response;
+    }
 }
