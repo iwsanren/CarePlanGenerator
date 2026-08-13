@@ -64,6 +64,14 @@ public class PatientExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    @ExceptionHandler(PatientHasActiveOrdersException.class)
+    public ResponseEntity<Map<String, Object>> handleActiveOrders(PatientHasActiveOrdersException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", ex.getMessage());
+        body.put("active_orders", ex.getActiveOrderIds());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     private String toApiFieldName(String fieldName) {
         return fieldName.replace("dateOfBirth", "date_of_birth")
                 .replace("weightKg", "weight_kg")

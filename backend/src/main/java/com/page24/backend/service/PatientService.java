@@ -14,6 +14,7 @@ import com.page24.backend.entity.Patient;
 import com.page24.backend.exception.PatientDuplicateException;
 import com.page24.backend.exception.PatientNotFoundException;
 import com.page24.backend.exception.PatientMrnModificationException;
+import com.page24.backend.exception.PatientHasActiveOrdersException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
@@ -150,6 +151,32 @@ public class PatientService {
 
         Patient updatedPatient = patientRepository.saveAndFlush(patient);
         return patientMapper.toUpdateResponse(updatedPatient);
+    }
+
+    @Transactional
+    public void deletePatient(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(PatientNotFoundException::new);
+
+        List<Long> activeOrderIds = carePlanRepository.findOrderIdsByPatientIdAndStatusIn(
+                id,
+                List.of(CarePlan.Status.PENDING, CarePlan.Status.PROCESSING)
+        );
+        if (!activeOrderIds.isEmpty()) {
+            throw new PatientHasActiveOrdersException(activeOrderIds);
+        }
+
+        // A Patient is referenced by Order, and an Order is referenced by CarePlan.
+        // Delete from the dependent tables first to preserve foreign-key integrity.
+        List<Order> orders = orderRepository.findByPatient(patient);
+        if (!orders.isEmpty()) {
+            carePlanRepository.deleteAll(carePlanRepository.findByOrderIn(orders));
+            carePlanRepository.flush();
+            orderRepository.deleteAll(orders);
+            orderRepository.flush();
+        }
+
+        patientRepository.delete(patient);
     }
 
     @Transactional(readOnly = true)

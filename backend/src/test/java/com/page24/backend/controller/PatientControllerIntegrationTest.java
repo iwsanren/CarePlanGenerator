@@ -28,6 +28,7 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -331,6 +332,71 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.error").value("Patient not found"));
     }
 
+    @Test
+    @DisplayName("DELETE /patients/{id} - rejects deletion when an order is pending")
+    void shouldRejectDeletionWhenPatientHasPendingOrders() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+        Order order = createOrder(patient, "IVIG");
+        createCarePlan(order, CarePlan.Status.PENDING);
+
+        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Cannot delete patient with active orders"))
+                .andExpect(jsonPath("$.active_orders[0]").value(order.getId()));
+
+        org.junit.jupiter.api.Assertions.assertTrue(patientRepository.existsById(patient.getId()));
+    }
+
+    @Test
+    @DisplayName("DELETE /patients/{id} - rejects deletion when an order is processing")
+    void shouldRejectDeletionWhenPatientHasProcessingOrders() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+        Order order = createOrder(patient, "IVIG");
+        createCarePlan(order, CarePlan.Status.PROCESSING);
+
+        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.active_orders[0]").value(order.getId()));
+    }
+
+    @Test
+    @DisplayName("DELETE /patients/{id} - deletes completed and failed order history with the patient")
+    void shouldDeletePatientAndInactiveOrderHistory() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+        Order completedOrder = createOrder(patient, "IVIG");
+        Order failedOrder = createOrder(patient, "Rituximab");
+        createCarePlan(completedOrder, CarePlan.Status.COMPLETED);
+        createCarePlan(failedOrder, CarePlan.Status.FAILED);
+
+        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+                .andExpect(status().isNoContent());
+
+        org.junit.jupiter.api.Assertions.assertFalse(patientRepository.existsById(patient.getId()));
+        org.junit.jupiter.api.Assertions.assertFalse(orderRepository.existsById(completedOrder.getId()));
+        org.junit.jupiter.api.Assertions.assertFalse(orderRepository.existsById(failedOrder.getId()));
+        org.junit.jupiter.api.Assertions.assertTrue(carePlanRepository.findByOrderId(completedOrder.getId()).isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(carePlanRepository.findByOrderId(failedOrder.getId()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("DELETE /patients/{id} - deletes a patient with no orders")
+    void shouldDeletePatientWithNoOrders() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+                .andExpect(status().isNoContent());
+
+        org.junit.jupiter.api.Assertions.assertFalse(patientRepository.existsById(patient.getId()));
+    }
+
+    @Test
+    @DisplayName("DELETE /patients/{id} - returns 404 for an unknown patient")
+    void shouldReturnNotFoundWhenDeletingUnknownPatient() throws Exception {
+        mockMvc.perform(delete("/patients/{id}", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Patient not found"));
+    }
+
     private Patient createPatient(String firstName, String lastName, String mrn) {
         Patient patient = new Patient();
         patient.setFirstName(firstName);
@@ -340,6 +406,29 @@ class PatientControllerIntegrationTest {
         patient.setPrimaryDiagnosis("G70.00");
         patient.setAdditionalDiagnoses(new ArrayList<>());
         return patientRepository.save(patient);
+    }
+
+    private Order createOrder(Patient patient, String medicationName) {
+        Provider provider = providerRepository.findByNpi("1234567890")
+                .orElseGet(() -> {
+                    Provider newProvider = new Provider();
+                    newProvider.setName("Dr. Jane Wilson");
+                    newProvider.setNpi("1234567890");
+                    return providerRepository.save(newProvider);
+                });
+
+        Order order = new Order();
+        order.setPatient(patient);
+        order.setProvider(provider);
+        order.setMedicationName(medicationName);
+        return orderRepository.save(order);
+    }
+
+    private void createCarePlan(Order order, CarePlan.Status status) {
+        CarePlan carePlan = new CarePlan();
+        carePlan.setOrder(order);
+        carePlan.setStatus(status);
+        carePlanRepository.save(carePlan);
     }
 
     private String validRequestJson(String mrn) {
