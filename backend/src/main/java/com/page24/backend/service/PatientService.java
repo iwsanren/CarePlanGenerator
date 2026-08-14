@@ -5,6 +5,7 @@ import com.page24.backend.dto.PatientMapper;
 import com.page24.backend.dto.PatientDetailMapper;
 import com.page24.backend.dto.PatientDetailResponse;
 import com.page24.backend.dto.PagedPatientResponse;
+import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
 import com.page24.backend.dto.PatientResponse;
@@ -180,6 +181,25 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
+    public PatientOrdersResponse getPatientOrders(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(PatientNotFoundException::new);
+
+        List<Order> orders = orderRepository.findByPatient(patient).stream()
+                .sorted(Comparator.comparing(Order::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+        Map<Long, CarePlan> carePlansByOrderId = findCarePlansByOrderId(orders);
+
+        List<com.page24.backend.dto.PatientOrderSummaryResponse> orderSummaries = orders.stream()
+                .map(order -> patientDetailMapper.toOrderSummary(order, carePlansByOrderId.get(order.getId())))
+                .toList();
+        String patientName = String.format("%s %s", patient.getFirstName(), patient.getLastName()).trim();
+
+        return new PatientOrdersResponse(patient.getId(), patientName, orderSummaries);
+    }
+
+    @Transactional(readOnly = true)
     public PatientDetailResponse getPatientById(Long id) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(PatientNotFoundException::new);
@@ -189,10 +209,7 @@ public class PatientService {
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
 
-        Map<Long, CarePlan> carePlansByOrderId = orders.isEmpty()
-                ? Map.of()
-                : carePlanRepository.findByOrderIn(orders).stream()
-                        .collect(Collectors.toMap(carePlan -> carePlan.getOrder().getId(), carePlan -> carePlan));
+        Map<Long, CarePlan> carePlansByOrderId = findCarePlansByOrderId(orders);
 
         List<String> medicationHistory = orders.stream()
                 .map(Order::getMedicationHistory)
@@ -213,5 +230,13 @@ public class PatientService {
             return null;
         }
         return value.trim();
+    }
+
+    private Map<Long, CarePlan> findCarePlansByOrderId(List<Order> orders) {
+        if (orders.isEmpty()) {
+            return Map.of();
+        }
+        return carePlanRepository.findByOrderIn(orders).stream()
+                .collect(Collectors.toMap(carePlan -> carePlan.getOrder().getId(), carePlan -> carePlan));
     }
 }

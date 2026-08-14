@@ -42,7 +42,7 @@ public class PatientDetailMapper {
         return response;
     }
 
-    private PatientOrderSummaryResponse toOrderSummary(Order order, CarePlan carePlan) {
+    public PatientOrderSummaryResponse toOrderSummary(Order order, CarePlan carePlan) {
         PatientOrderSummaryResponse response = new PatientOrderSummaryResponse();
         response.setId(order.getId());
         response.setMedicationName(order.getMedicationName());

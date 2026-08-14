@@ -6,6 +6,7 @@ import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.dto.PatientResponse;
 import com.page24.backend.dto.UpdatePatientRequest;
 import com.page24.backend.dto.UpdatePatientResponse;
+import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.service.PatientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,11 @@ public class PatientController {
     @GetMapping("/patients/{id}")
     public ResponseEntity<PatientDetailResponse> getPatientById(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getPatientById(id));
+    }
+
+    @GetMapping("/patients/{id}/orders")
+    public ResponseEntity<PatientOrdersResponse> getPatientOrders(@PathVariable Long id) {
+        return ResponseEntity.ok(patientService.getPatientOrders(id));
     }
 
     @PutMapping("/patients/{id}")

@@ -1,6 +1,7 @@
 package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreateOrderRequest;
+import com.page24.backend.dto.CarePlanStatusResponse;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.service.OrderService;
@@ -37,10 +38,9 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Day 6: Polling 状态查询 API
     @GetMapping("/{id}/status")
-    public ResponseEntity<OrderResponse> getCarePlanStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getOrderById(id));
+    public ResponseEntity<CarePlanStatusResponse> getCarePlanStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getCarePlanStatus(id));
     }
 
     @GetMapping("/{id}")

@@ -23,6 +23,13 @@ public class CarePlan {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
+    /**
+     * A short, safe message shown to the client when generation fails.
+     * Technical exception details remain in server logs and must not be exposed.
+     */
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

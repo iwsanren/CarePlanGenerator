@@ -32,6 +32,8 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class CarePlanGenerationService {
 
+    private static final String GENERATION_FAILURE_MESSAGE = "LLM service unavailable";
+
     // 业务层不直接依赖 OpenAI/Claude：通过 factory 选出当前 provider。
     private final LLMAdapterFactory llmAdapterFactory;
     private final CarePlanRepository carePlanRepository;
@@ -70,6 +72,7 @@ public class CarePlanGenerationService {
         // 成功：更新数据库
         carePlan.setContent(content);
         carePlan.setStatus(CarePlan.Status.COMPLETED);
+        carePlan.setErrorMessage(null);
         carePlanRepository.save(carePlan);
 
         log.info("✅ Care Plan 生成完成 (carePlanId={})", carePlanId);
@@ -91,6 +94,9 @@ public class CarePlanGenerationService {
         // 把状态改成 FAILED，用户可以后续手动重新提交
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.FAILED);
+            // Store a stable, user-safe message. The original exception can include
+            // provider internals or patient data and must stay in server logs only.
+            carePlan.setErrorMessage(GENERATION_FAILURE_MESSAGE);
             carePlanRepository.save(carePlan);
         });
     }

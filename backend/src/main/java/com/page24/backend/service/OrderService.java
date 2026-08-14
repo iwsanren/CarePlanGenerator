@@ -1,12 +1,14 @@
 package com.page24.backend.service;
 
 import com.page24.backend.dto.CreateOrderRequest;
+import com.page24.backend.dto.CarePlanStatusResponse;
 import com.page24.backend.dto.OrderMapper;
 import com.page24.backend.dto.OrderListItemResponse;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.entity.*;
 import com.page24.backend.exception.BlockError;
+import com.page24.backend.exception.OrderNotFoundException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.exception.WarningException;
 import com.page24.backend.repository.*;
@@ -46,6 +48,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class OrderService {
+
+    private static final int CARE_PLAN_PREVIEW_LENGTH = 300;
 
     private final PatientRepository patientRepository;
     private final ProviderRepository providerRepository;
@@ -279,6 +283,37 @@ public class OrderService {
     private OrderResponse toOrderResponse(Order order) {
         CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
         return orderMapper.toResponse(order, carePlan);
+    }
+
+    /**
+     * Returns the small response used by the front end while it polls for an
+     * asynchronous CarePlan generation result.
+     */
+    public CarePlanStatusResponse getCarePlanStatus(Long orderId) {
+        orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        CarePlan carePlan = carePlanRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
+
+        CarePlanStatusResponse response = new CarePlanStatusResponse();
+        response.setOrderId(orderId);
+        response.setStatus(carePlan.getStatus().name().toLowerCase(Locale.ROOT));
+
+        if (carePlan.getStatus() == CarePlan.Status.COMPLETED) {
+            response.setCarePlanPreview(toPreview(carePlan.getContent()));
+        } else if (carePlan.getStatus() == CarePlan.Status.FAILED) {
+            response.setErrorMessage(carePlan.getErrorMessage());
+        }
+
+        return response;
+    }
+
+    private String toPreview(String content) {
+        if (content == null || content.length() <= CARE_PLAN_PREVIEW_LENGTH) {
+            return content;
+        }
+        return content.substring(0, CARE_PLAN_PREVIEW_LENGTH) + "...";
     }
 
     private OrderListItemResponse toListItemResponse(Order order) {

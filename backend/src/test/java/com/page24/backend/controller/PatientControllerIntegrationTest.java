@@ -397,6 +397,49 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.error").value("Patient not found"));
     }
 
+    @Test
+    @DisplayName("GET /patients/{id}/orders - returns all order summaries for the patient")
+    void shouldGetPatientOrders() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+        Order completedOrder = createOrder(patient, "IVIG");
+        Order pendingOrder = createOrder(patient, "Rituximab");
+        createCarePlan(completedOrder, CarePlan.Status.COMPLETED);
+        createCarePlan(pendingOrder, CarePlan.Status.PENDING);
+
+        mockMvc.perform(get("/patients/{id}/orders", patient.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patient_id").value(patient.getId()))
+                .andExpect(jsonPath("$.patient_name").value("John Smith"))
+                .andExpect(jsonPath("$.orders.length()").value(2))
+                .andExpect(jsonPath("$.orders[0].id").value(pendingOrder.getId()))
+                .andExpect(jsonPath("$.orders[0].medication_name").value("Rituximab"))
+                .andExpect(jsonPath("$.orders[0].status").value("pending"))
+                .andExpect(jsonPath("$.orders[1].id").value(completedOrder.getId()))
+                .andExpect(jsonPath("$.orders[1].medication_name").value("IVIG"))
+                .andExpect(jsonPath("$.orders[1].status").value("completed"))
+                .andExpect(jsonPath("$.orders[0].created_at").exists());
+    }
+
+    @Test
+    @DisplayName("GET /patients/{id}/orders - returns an empty order collection for a patient with no orders")
+    void shouldReturnEmptyOrdersForPatientWithNoOrders() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(get("/patients/{id}/orders", patient.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patient_id").value(patient.getId()))
+                .andExpect(jsonPath("$.patient_name").value("John Smith"))
+                .andExpect(jsonPath("$.orders.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /patients/{id}/orders - returns 404 for an unknown patient")
+    void shouldReturnNotFoundForUnknownPatientOrders() throws Exception {
+        mockMvc.perform(get("/patients/{id}/orders", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Patient not found"));
+    }
+
     private Patient createPatient(String firstName, String lastName, String mrn) {
         Patient patient = new Patient();
         patient.setFirstName(firstName);
