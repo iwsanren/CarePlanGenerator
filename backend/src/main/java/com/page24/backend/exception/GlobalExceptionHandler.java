@@ -16,6 +16,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(CarePlanNotReadyException.class)
+    public ResponseEntity<Map<String, String>> handleCarePlanNotReady(CarePlanNotReadyException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
     @ExceptionHandler(BaseAppException.class)
     public ResponseEntity<ApiErrorResponse> handleBaseAppException(BaseAppException ex) {
         ApiErrorResponse body = new ApiErrorResponse(

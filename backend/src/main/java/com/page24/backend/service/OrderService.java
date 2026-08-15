@@ -2,12 +2,14 @@ package com.page24.backend.service;
 
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.CarePlanStatusResponse;
+import com.page24.backend.dto.CarePlanDownload;
 import com.page24.backend.dto.OrderMapper;
 import com.page24.backend.dto.OrderListItemResponse;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.entity.*;
 import com.page24.backend.exception.BlockError;
+import com.page24.backend.exception.CarePlanNotReadyException;
 import com.page24.backend.exception.OrderNotFoundException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.exception.WarningException;
@@ -366,89 +368,20 @@ public class OrderService {
      *
      * 返回 byte[]，Controller 只负责设置 HTTP 响应头
      */
-    public byte[] getDownloadBytes(Long id) {
+    public CarePlanDownload downloadCarePlan(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         CarePlan carePlan = carePlanRepository.findByOrderId(id)
-                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
+                .orElseThrow(CarePlanNotReadyException::new);
 
-        if (carePlan.getStatus() != CarePlan.Status.COMPLETED) {
-            throw new BlockError("CAREPLAN_NOT_COMPLETED", "CarePlan is not completed yet");
+        if (carePlan.getStatus() != CarePlan.Status.COMPLETED || carePlan.getContent() == null) {
+            throw new CarePlanNotReadyException();
         }
 
-        String content = buildDownloadContent(order, carePlan);
-        return content.getBytes(StandardCharsets.UTF_8);
-    }
-
-    /**
-     * 根据订单 ID 获取文件名（供 Controller 设置 Content-Disposition 头用）
-     */
-    public String getDownloadFilename(Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
-
-        return String.format("CarePlan_%s_%s_%d.txt",
-                order.getPatient().getFirstName(),
-                order.getPatient().getLastName(),
-                order.getId());
-    }
-
-    /**
-     * 拼装 CarePlan 下载文件的文字内容
-     *
-     * 原来在 OrderController 第 226-277 行的 buildDownloadContent() 私有方法
-     */
-    private String buildDownloadContent(Order order, CarePlan carePlan) {
-        Patient patient = order.getPatient();
-        Provider provider = order.getProvider();
-
-        return String.format("""
-                ================================================================================
-                                            CARE PLAN
-                ================================================================================
-                
-                PATIENT INFORMATION
-                --------------------------------------------------------------------------------
-                Name: %s %s
-                MRN: %s
-                Date of Birth: %s
-                
-                PROVIDER INFORMATION
-                --------------------------------------------------------------------------------
-                Provider: %s
-                NPI: %s
-                
-                ORDER INFORMATION
-                --------------------------------------------------------------------------------
-                Order ID: %d
-                Medication: %s
-                Primary Diagnosis: %s
-                Additional Diagnoses: %s
-                
-                CARE PLAN CONTENT
-                ================================================================================
-                %s
-                
-                ================================================================================
-                Generated on: %s
-                Status: %s
-                ================================================================================
-                """,
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getMrn(),
-                patient.getDateOfBirth(),
-                provider.getName(),
-                provider.getNpi(),
-                order.getId(),
-                order.getMedicationName(),
-                order.getPrimaryDiagnosis(),
-                order.getAdditionalDiagnosis(),
-                carePlan.getContent(),
-                carePlan.getUpdatedAt(),
-                carePlan.getStatus()
-        );
+        byte[] content = carePlan.getContent().getBytes(StandardCharsets.UTF_8);
+        String filename = "careplan_order_" + order.getId() + ".txt";
+        return new CarePlanDownload(filename, content);
     }
 }
 

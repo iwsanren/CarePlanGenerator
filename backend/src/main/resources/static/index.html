@@ -511,7 +511,7 @@
 
         async function downloadCarePlan(orderId) {
             try {
-                const response = await fetch(`${API_BASE_URL}/${orderId}/download`);
+                const response = await fetch(`${API_BASE_URL}/${orderId}/careplan/download`);
 
                 if (!response.ok) {
                     const error = await response.text();

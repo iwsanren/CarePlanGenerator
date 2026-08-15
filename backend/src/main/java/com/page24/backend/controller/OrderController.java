@@ -2,6 +2,7 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.CarePlanStatusResponse;
+import com.page24.backend.dto.CarePlanDownload;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.service.OrderService;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 /**
  * OrderController - HTTP 请求/响应层
@@ -67,15 +69,14 @@ public class OrderController {
         return ResponseEntity.ok(orderService.searchOrders(patientName, mrn));
     }
 
-    @GetMapping("/{id}/download")
+    @GetMapping("/{id}/careplan/download")
     public ResponseEntity<byte[]> downloadCarePlan(@PathVariable Long id) {
-        byte[] bytes = orderService.getDownloadBytes(id);
-        String filename = orderService.getDownloadFilename(id);
+        CarePlanDownload download = orderService.downloadCarePlan(id);
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.TEXT_PLAIN)
-                .contentLength(bytes.length)
-                .body(bytes);
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + download.filename() + "\"")
+                .contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
+                .contentLength(download.content().length)
+                .body(download.content());
     }
 }
