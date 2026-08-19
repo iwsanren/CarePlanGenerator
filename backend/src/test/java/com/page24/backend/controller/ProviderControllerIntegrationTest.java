@@ -18,7 +18,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,7 +69,31 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
                 .andExpect(jsonPath("$.npi").value("1234567890"))
-                .andExpect(jsonPath("$.created_at").exists());
+                .andExpect(jsonPath("$.phone").isEmpty())
+                .andExpect(jsonPath("$.fax").isEmpty())
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/providers - creates provider with optional contact fields")
+    void shouldCreateProviderViaV1RouteWithContactFields() throws Exception {
+        mockMvc.perform(post("/api/v1/providers/")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson(
+                                "Dr. Jane Wilson",
+                                "1234567890",
+                                "+1-555-0100",
+                                "+1-555-0101"
+                        )))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
+                .andExpect(jsonPath("$.npi").value("1234567890"))
+                .andExpect(jsonPath("$.phone").value("+1-555-0100"))
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
     }
 
     @Test
@@ -136,6 +162,50 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.existing_provider_id").value(existingProvider.getId()));
     }
 
+    @Test
+    @DisplayName("GET /api/v1/providers - returns Provider list sorted by name")
+    void shouldListProvidersSortedByName() throws Exception {
+        Provider firstProvider = saveProvider("Dr. Aaron Adams", "1111111111");
+        Provider secondProvider = saveProvider("Dr. Zoe Wilson", "2222222222");
+
+        mockMvc.perform(providerListRequest(1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2))
+                .andExpect(jsonPath("$.next").isEmpty())
+                .andExpect(jsonPath("$.previous").isEmpty())
+                .andExpect(jsonPath("$.results.length()").value(2))
+                .andExpect(jsonPath("$.results[0].id").value(firstProvider.getId()))
+                .andExpect(jsonPath("$.results[0].npi").value("1111111111"))
+                .andExpect(jsonPath("$.results[0].name").value("Dr. Aaron Adams"))
+                .andExpect(jsonPath("$.results[0].created_at").doesNotExist())
+                .andExpect(jsonPath("$.results[1].id").value(secondProvider.getId()))
+                .andExpect(jsonPath("$.results[1].name").value("Dr. Zoe Wilson"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/providers - paginates in fixed pages of twenty")
+    void shouldPaginateProvidersWithFixedPageSize() throws Exception {
+        for (int index = 1; index <= 21; index++) {
+            saveProvider("Provider %02d".formatted(index), "%010d".formatted(index));
+        }
+
+        mockMvc.perform(providerListRequest(1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(21))
+                .andExpect(jsonPath("$.next").value("http://localhost:8080/api/v1/providers/?page=2"))
+                .andExpect(jsonPath("$.previous").isEmpty())
+                .andExpect(jsonPath("$.results.length()").value(20))
+                .andExpect(jsonPath("$.results[0].name").value("Provider 01"));
+
+        mockMvc.perform(providerListRequest(2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(21))
+                .andExpect(jsonPath("$.next").isEmpty())
+                .andExpect(jsonPath("$.previous").value("http://localhost:8080/api/v1/providers/?page=1"))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].name").value("Provider 21"));
+    }
+
     private Provider saveProvider(String name, String npi) {
         Provider provider = new Provider();
         provider.setName(name);
@@ -150,5 +220,27 @@ class ProviderControllerIntegrationTest {
                   "npi": "%s"
                 }
                 """.formatted(name, npi);
+    }
+
+    private String requestJson(String name, String npi, String phone, String fax) {
+        return """
+                {
+                  "name": "%s",
+                  "npi": "%s",
+                  "phone": "%s",
+                  "fax": "%s"
+                }
+                """.formatted(name, npi, phone, fax);
+    }
+
+    private MockHttpServletRequestBuilder providerListRequest(int page) {
+        return get("/api/v1/providers/")
+                .param("page", String.valueOf(page))
+                .with(request -> {
+                    request.setServerName("localhost");
+                    request.setServerPort(8080);
+                    request.setScheme("http");
+                    return request;
+                });
     }
 }

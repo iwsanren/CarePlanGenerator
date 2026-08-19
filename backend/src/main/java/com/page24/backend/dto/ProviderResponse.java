@@ -10,7 +10,12 @@ public class ProviderResponse {
     private Long id;
     private String name;
     private String npi;
+    private String phone;
+    private String fax;
 
     @JsonProperty("created_at")
     private Instant createdAt;
+
+    @JsonProperty("updated_at")
+    private Instant updatedAt;
 }

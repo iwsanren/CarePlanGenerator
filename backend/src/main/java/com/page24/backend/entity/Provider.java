@@ -19,12 +19,28 @@ public class Provider {
     @Column(name = "npi", unique = true, nullable = false, length = 10)
     private String npi;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "fax", length = 20)
+    private String fax;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }
 
