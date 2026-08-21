@@ -304,46 +304,6 @@ Prometheus configuration:
 resources/prometheus/prometheus.yml
 ```
 
-## AWS Practice Code
-
-The repository includes AWS Lambda/SQS practice classes:
-
-- `CreateOrderHandler`
-- `GetOrderHandler`
-- `SqsCarePlanQueue`
-- `LambdaSpringContext`
-- `LambdaApplication`
-
-Packaging config:
-
-```text
-src/assembly/aws-lambda.xml
-```
-
-Build package:
-
-```bash
-./mvnw package
-```
-
-AWS deployment is not required for local development. In the course plan, AWS appears in Days 12-15: first using the AWS Console manually, then connecting API Gateway, Lambda, SQS, and RDS, and finally automating infrastructure with Terraform.
-
-## Course Map
-
-| Day | Topic | Java/Spring Boot implementation |
-|---|---|---|
-| 1 | Requirements + design doc | `docs/` |
-| 2 | Synchronous MVP | Spring Controller + Service + LLM |
-| 3 | Database design | JPA Entity + Repository + PostgreSQL |
-| 4 | Message queue | Redis queue |
-| 5 | Worker | Scheduled worker + Spring Retry |
-| 6 | Frontend status updates | Polling API |
-| 7 | Code refactor | Controller-Service-Repository layering |
-| 8 | Errors, warnings, tests | Validation, unified errors, JUnit |
-| 9-10 | Adapter Pattern | Multi-source adapters under `intake/` |
-| 11 | Monitoring | Actuator + Prometheus + Grafana |
-| 12-15 | AWS / SQS / Terraform | Lambda/SQS code and later infra work |
-| 16 | RESTful API practice | Independent CRUD practice |
 
 ## Common Questions
 
@@ -359,8 +319,3 @@ The mock provider avoids API keys, API costs, and network instability while you 
 
 Polling is intentionally introduced first because it is simpler and easier to reason about. WebSocket adds connection management, reconnect behavior, and scaling concerns. Those are valuable topics, but they make more sense after the polling version is working.
 
-## Good Files to Read Next
-
-- `docs/project-instructions.md`: original project requirements and learning goals
-- `notes/`: day-by-day notes and stage explanations
-- `src/test/java/com/page24/backend`: tests that describe expected behavior
