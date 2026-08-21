@@ -50,4 +50,18 @@ public class ProviderExceptionHandler {
                 "existing_provider_id", ex.getExistingProviderId()
         ));
     }
+
+    @ExceptionHandler(ProviderNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleProviderNotFound(ProviderNotFoundException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", "not_found");
+        body.put("message", ex.getMessage());
+        body.put("details", null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(ProviderNpiNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleProviderNpiNotFound(ProviderNpiNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("detail", ex.getMessage()));
+    }
 }

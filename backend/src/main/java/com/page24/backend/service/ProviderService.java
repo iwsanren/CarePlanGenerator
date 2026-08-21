@@ -7,6 +7,8 @@ import com.page24.backend.dto.ProviderResponse;
 import com.page24.backend.entity.Provider;
 import com.page24.backend.exception.ProviderNameDuplicateException;
 import com.page24.backend.exception.ProviderNpiConflictException;
+import com.page24.backend.exception.ProviderNpiNotFoundException;
+import com.page24.backend.exception.ProviderNotFoundException;
 import com.page24.backend.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -68,6 +70,20 @@ public class ProviderService {
                 providers.hasPrevious() ? pageUrl(baseUrl, page - 1) : null,
                 providers.getContent().stream().map(providerMapper::toListItemResponse).toList()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public ProviderResponse getProviderById(Long id) {
+        Provider provider = providerRepository.findById(id)
+                .orElseThrow(ProviderNotFoundException::new);
+        return providerMapper.toResponse(provider);
+    }
+
+    @Transactional(readOnly = true)
+    public ProviderResponse getProviderByNpi(String npi) {
+        Provider provider = providerRepository.findByNpi(npi)
+                .orElseThrow(ProviderNpiNotFoundException::new);
+        return providerMapper.toResponse(provider);
     }
 
     private String pageUrl(String baseUrl, int page) {

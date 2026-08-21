@@ -206,6 +206,62 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.results[0].name").value("Provider 21"));
     }
 
+    @Test
+    @DisplayName("GET /api/v1/providers/by-id/{id} - returns the complete Provider record")
+    void shouldGetProviderById() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        provider.setPhone("+1-555-0100");
+        provider.setFax("+1-555-0101");
+        provider = providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(get("/api/v1/providers/by-id/{id}/", provider.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(provider.getId()))
+                .andExpect(jsonPath("$.npi").value("1234567890"))
+                .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
+                .andExpect(jsonPath("$.phone").value("+1-555-0100"))
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/providers/by-id/{id} - returns reference-style 404 when absent")
+    void shouldReturnNotFoundWhenProviderDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/v1/providers/by-id/999999/"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"))
+                .andExpect(jsonPath("$.message").value("No Provider matches the given query."))
+                .andExpect(jsonPath("$.details").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/providers/by-npi/{npi} - returns the complete Provider record")
+    void shouldGetProviderByNpi() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        provider.setPhone("+1-555-0100");
+        provider.setFax("+1-555-0101");
+        providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(get("/api/v1/providers/by-npi/1234567890/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(provider.getId()))
+                .andExpect(jsonPath("$.npi").value("1234567890"))
+                .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
+                .andExpect(jsonPath("$.phone").value("+1-555-0100"))
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/providers/by-npi/{npi} - returns requested 404 body when absent")
+    void shouldReturnProviderNotFoundWhenNpiDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/v1/providers/by-npi/1234567890/"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Provider not found"));
+    }
+
     private Provider saveProvider(String name, String npi) {
         Provider provider = new Provider();
         provider.setName(name);
