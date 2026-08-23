@@ -2,13 +2,16 @@ package com.page24.backend.service;
 
 import com.page24.backend.dto.CreateProviderRequest;
 import com.page24.backend.dto.PagedProviderResponse;
+import com.page24.backend.dto.PatchProviderRequest;
 import com.page24.backend.dto.ProviderMapper;
 import com.page24.backend.dto.ProviderResponse;
+import com.page24.backend.dto.UpdateProviderRequest;
 import com.page24.backend.entity.Provider;
 import com.page24.backend.exception.ProviderNameDuplicateException;
 import com.page24.backend.exception.ProviderNpiConflictException;
 import com.page24.backend.exception.ProviderNpiNotFoundException;
 import com.page24.backend.exception.ProviderNotFoundException;
+import com.page24.backend.exception.ProviderPatchValidationException;
 import com.page24.backend.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -84,6 +87,69 @@ public class ProviderService {
         Provider provider = providerRepository.findByNpi(npi)
                 .orElseThrow(ProviderNpiNotFoundException::new);
         return providerMapper.toResponse(provider);
+    }
+
+    @Transactional
+    public ProviderResponse updateProvider(Long id, UpdateProviderRequest request) {
+        Provider provider = providerRepository.findById(id)
+                .orElseThrow(ProviderNotFoundException::new);
+        String name = request.getName().trim();
+        String npi = request.getNpi();
+
+        providerRepository.findByNpi(npi)
+                .filter(existingProvider -> !existingProvider.getId().equals(id))
+                .ifPresent(existingProvider -> {
+                    String message = "Provider conflict: NPI " + npi + " already belongs to '"
+                            + existingProvider.getName() + "'";
+                    throw new ProviderNpiConflictException(message, existingProvider.getId());
+                });
+
+        provider.setName(name);
+        provider.setNpi(npi);
+        provider.setPhone(request.getPhone());
+        provider.setFax(request.getFax());
+
+        return providerMapper.toResponse(providerRepository.saveAndFlush(provider));
+    }
+
+    @Transactional
+    public ProviderResponse patchProvider(Long id, PatchProviderRequest request) {
+        Provider provider = providerRepository.findById(id)
+                .orElseThrow(ProviderNotFoundException::new);
+
+        validateNonNullPatchFields(request);
+
+        if (request.isNpiProvided()) {
+            String npi = request.getNpi();
+            providerRepository.findByNpi(npi)
+                    .filter(existingProvider -> !existingProvider.getId().equals(id))
+                    .ifPresent(existingProvider -> {
+                        String message = "Provider conflict: NPI " + npi + " already belongs to '"
+                                + existingProvider.getName() + "'";
+                        throw new ProviderNpiConflictException(message, existingProvider.getId());
+                    });
+            provider.setNpi(npi);
+        }
+        if (request.isNameProvided()) {
+            provider.setName(request.getName().trim());
+        }
+        if (request.isPhoneProvided()) {
+            provider.setPhone(request.getPhone());
+        }
+        if (request.isFaxProvided()) {
+            provider.setFax(request.getFax());
+        }
+
+        return providerMapper.toResponse(providerRepository.saveAndFlush(provider));
+    }
+
+    private void validateNonNullPatchFields(PatchProviderRequest request) {
+        if (request.isNameProvided() && request.getName() == null) {
+            throw new ProviderPatchValidationException("name", "name is required");
+        }
+        if (request.isNpiProvided() && request.getNpi() == null) {
+            throw new ProviderPatchValidationException("npi", "npi is required");
+        }
     }
 
     private String pageUrl(String baseUrl, int page) {

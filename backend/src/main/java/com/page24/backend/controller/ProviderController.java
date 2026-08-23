@@ -2,7 +2,9 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreateProviderRequest;
 import com.page24.backend.dto.PagedProviderResponse;
+import com.page24.backend.dto.PatchProviderRequest;
 import com.page24.backend.dto.ProviderResponse;
+import com.page24.backend.dto.UpdateProviderRequest;
 import com.page24.backend.service.ProviderService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -10,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -52,5 +56,21 @@ public class ProviderController {
     @GetMapping({"/api/v1/providers/by-npi/{npi}", "/api/v1/providers/by-npi/{npi}/"})
     public ResponseEntity<ProviderResponse> getProviderByNpi(@PathVariable String npi) {
         return ResponseEntity.ok(providerService.getProviderByNpi(npi));
+    }
+
+    @PutMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    public ResponseEntity<ProviderResponse> updateProvider(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateProviderRequest request
+    ) {
+        return ResponseEntity.ok(providerService.updateProvider(id, request));
+    }
+
+    @PatchMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    public ResponseEntity<ProviderResponse> patchProvider(
+            @PathVariable Long id,
+            @Valid @RequestBody PatchProviderRequest request
+    ) {
+        return ResponseEntity.ok(providerService.patchProvider(id, request));
     }
 }

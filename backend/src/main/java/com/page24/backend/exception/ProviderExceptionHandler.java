@@ -64,4 +64,12 @@ public class ProviderExceptionHandler {
     public ResponseEntity<Map<String, String>> handleProviderNpiNotFound(ProviderNpiNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("detail", ex.getMessage()));
     }
+
+    @ExceptionHandler(ProviderPatchValidationException.class)
+    public ResponseEntity<Map<String, Object>> handlePatchValidation(ProviderPatchValidationException ex) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "error", "Validation failed",
+                "details", Map.of(ex.getField(), ex.getMessage())
+        ));
+    }
 }

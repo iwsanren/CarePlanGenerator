@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -260,6 +262,119 @@ class ProviderControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/providers/by-npi/1234567890/"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Provider not found"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/providers/{id} - fully replaces Provider fields")
+    void shouldFullyUpdateProvider() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        provider.setPhone("+1-555-0100");
+        provider.setFax("+1-555-0101");
+        provider = providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(put("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson(
+                                "Dr. Jane M. Wilson",
+                                "1234567890",
+                                "+1-555-0199",
+                                "+1-555-0101"
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(provider.getId()))
+                .andExpect(jsonPath("$.npi").value("1234567890"))
+                .andExpect(jsonPath("$.name").value("Dr. Jane M. Wilson"))
+                .andExpect(jsonPath("$.phone").value("+1-555-0199"))
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/providers/{id} - omitting optional contacts clears them")
+    void shouldClearOptionalContactFieldsOnFullUpdate() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        provider.setPhone("+1-555-0100");
+        provider.setFax("+1-555-0101");
+        provider = providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(put("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("Dr. Jane Wilson", "1234567890")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").isEmpty())
+                .andExpect(jsonPath("$.fax").isEmpty());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/providers/{id} - missing required NPI returns 400")
+    void shouldRequireNpiForFullUpdate() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+
+        mockMvc.perform(put("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "Dr. Jane M. Wilson" }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.details.npi").value("npi is required"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/providers/{id} - updates only supplied fields")
+    void shouldPatchOnlySuppliedProviderFields() throws Exception {
+        Provider provider = saveProvider("Dr. Jane M. Wilson", "1234567890");
+        provider.setPhone("+1-555-0199");
+        provider.setFax("+1-555-0101");
+        provider = providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(patch("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "phone": "+1-555-0200" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(provider.getId()))
+                .andExpect(jsonPath("$.npi").value("1234567890"))
+                .andExpect(jsonPath("$.name").value("Dr. Jane M. Wilson"))
+                .andExpect(jsonPath("$.phone").value("+1-555-0200"))
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/providers/{id} - explicit null clears an optional contact")
+    void shouldClearOptionalContactWhenPatchContainsNull() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        provider.setPhone("+1-555-0100");
+        provider.setFax("+1-555-0101");
+        provider = providerRepository.saveAndFlush(provider);
+
+        mockMvc.perform(patch("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "phone": null }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").isEmpty())
+                .andExpect(jsonPath("$.fax").value("+1-555-0101"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/providers/{id} - validates a supplied NPI")
+    void shouldValidateSuppliedNpiOnPatch() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+
+        mockMvc.perform(patch("/api/v1/providers/{id}/", provider.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "npi": "123" }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.details.npi").value("NPI must be exactly 10 digits"));
     }
 
     private Provider saveProvider(String name, String npi) {
