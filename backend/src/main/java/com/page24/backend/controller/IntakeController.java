@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
  * Step3 focus: source-specific parsing/mapping, then reuse OrderService.
  */
 @RestController
-@RequestMapping("/api/intake")
+@RequestMapping("/api/v1/intake")
 @RequiredArgsConstructor
 @Validated
 public class IntakeController {

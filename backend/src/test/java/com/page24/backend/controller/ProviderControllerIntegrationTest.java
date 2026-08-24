@@ -66,9 +66,9 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - creates provider with 201")
+    @DisplayName("POST /api/v1/providers - creates provider with 201")
     void shouldCreateProvider() throws Exception {
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("Dr. Jane Wilson", "1234567890")))
                 .andExpect(status().isCreated())
@@ -103,9 +103,9 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - blank name returns 400")
+    @DisplayName("POST /api/v1/providers - blank name returns 400")
     void shouldRejectBlankName() throws Exception {
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("   ", "1234567890")))
                 .andExpect(status().isBadRequest())
@@ -114,9 +114,9 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - invalid NPI returns 400")
+    @DisplayName("POST /api/v1/providers - invalid NPI returns 400")
     void shouldRejectInvalidNpi() throws Exception {
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("Dr. Jane Wilson", "123456789")))
                 .andExpect(status().isBadRequest())
@@ -125,11 +125,11 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - same name with different NPI returns duplicate warning")
+    @DisplayName("POST /api/v1/providers - same name with different NPI returns duplicate warning")
     void shouldWarnForSameNameWithDifferentNpi() throws Exception {
         Provider existingProvider = saveProvider("Dr. Jane Wilson", "9876543210");
 
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("dr. jane wilson", "1234567890")))
                 .andExpect(status().isConflict())
@@ -141,11 +141,11 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - same NPI with different name returns conflict")
+    @DisplayName("POST /api/v1/providers - same NPI with different name returns conflict")
     void shouldRejectSameNpiWithDifferentName() throws Exception {
         Provider existingProvider = saveProvider("Dr. Jane Wilson", "1234567890");
 
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("Dr. John Wilson", "1234567890")))
                 .andExpect(status().isConflict())
@@ -156,11 +156,11 @@ class ProviderControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /providers - same NPI and name returns conflict")
+    @DisplayName("POST /api/v1/providers - same NPI and name returns conflict")
     void shouldRejectDuplicateNpiAndName() throws Exception {
         Provider existingProvider = saveProvider("Dr. Jane Wilson", "1234567890");
 
-        mockMvc.perform(post("/providers")
+        mockMvc.perform(post("/api/v1/providers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("dr. jane wilson", "1234567890")))
                 .andExpect(status().isConflict())

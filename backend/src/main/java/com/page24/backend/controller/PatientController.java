@@ -19,21 +19,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequestMapping("/api/v1/patients")
 @RequiredArgsConstructor
 public class PatientController {
 
     private final PatientService patientService;
 
-    @PostMapping("/patients")
+    @PostMapping
     public ResponseEntity<PatientResponse> createPatient(@Valid @RequestBody CreatePatientRequest request) {
         PatientResponse response = patientService.createPatient(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/patients")
+    @GetMapping
     public ResponseEntity<PagedPatientResponse> getPatients(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
@@ -42,17 +44,17 @@ public class PatientController {
         return ResponseEntity.ok(patientService.getPatients(page, pageSize, search));
     }
 
-    @GetMapping("/patients/{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<PatientDetailResponse> getPatientById(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getPatientById(id));
     }
 
-    @GetMapping("/patients/{id}/orders")
+    @GetMapping("/{id}/orders")
     public ResponseEntity<PatientOrdersResponse> getPatientOrders(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getPatientOrders(id));
     }
 
-    @PutMapping("/patients/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<UpdatePatientResponse> updatePatient(
             @PathVariable Long id,
             @Valid @RequestBody UpdatePatientRequest request
@@ -60,7 +62,7 @@ public class PatientController {
         return ResponseEntity.ok(patientService.updatePatient(id, request));
     }
 
-    @DeleteMapping("/patients/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePatient(@PathVariable Long id) {
         patientService.deletePatient(id);
         return ResponseEntity.noContent().build();

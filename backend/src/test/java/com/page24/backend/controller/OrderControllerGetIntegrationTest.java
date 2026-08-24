@@ -68,13 +68,13 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - returns paginated response shape")
+    @DisplayName("GET /api/v1/orders - returns paginated response shape")
     void shouldReturnPagedOrders() throws Exception {
         createOrder("Alice", "Wong", "100001", CarePlan.Status.PENDING);
         createOrder("Bob", "Lee", "100002", CarePlan.Status.COMPLETED);
         createOrder("Cathy", "Chen", "100003", CarePlan.Status.FAILED);
 
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .param("page", "1")
                         .param("page_size", "2"))
                 .andExpect(status().isOk())
@@ -85,12 +85,12 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - status=completed returns only completed orders")
+    @DisplayName("GET /api/v1/orders - status=completed returns only completed orders")
     void shouldFilterByStatus() throws Exception {
         createOrder("Alice", "Wong", "100001", CarePlan.Status.PENDING);
         createOrder("Bob", "Lee", "100002", CarePlan.Status.COMPLETED);
 
-        mockMvc.perform(get("/api/orders/")
+        mockMvc.perform(get("/api/v1/orders/")
                         .param("status", "completed"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
@@ -98,12 +98,12 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - patient_name supports fuzzy search")
+    @DisplayName("GET /api/v1/orders - patient_name supports fuzzy search")
     void shouldSearchByPatientName() throws Exception {
         createOrder("张", "三", "100001", CarePlan.Status.COMPLETED);
         createOrder("Alice", "Wong", "100002", CarePlan.Status.PENDING);
 
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .param("patient_name", "张"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
@@ -111,13 +111,13 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - supports status and patient_name together")
+    @DisplayName("GET /api/v1/orders - supports status and patient_name together")
     void shouldFilterByStatusAndPatientName() throws Exception {
         createOrder("张", "三", "100001", CarePlan.Status.COMPLETED);
         createOrder("张", "四", "100002", CarePlan.Status.PENDING);
         createOrder("Alice", "Wong", "100003", CarePlan.Status.COMPLETED);
 
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .param("status", "completed")
                         .param("patient_name", "张"))
                 .andExpect(status().isOk())
@@ -126,7 +126,7 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - combines status, patient_id, and provider_id filters")
+    @DisplayName("GET /api/v1/orders - combines status, patient_id, and provider_id filters")
     void shouldFilterByStatusPatientAndProvider() throws Exception {
         Patient matchingPatient = createPatient("Alice", "Wong", "100001");
         Patient otherPatient = createPatient("Bob", "Lee", "100002");
@@ -139,7 +139,7 @@ class OrderControllerGetIntegrationTest {
         createOrder(matchingPatient, otherProvider, CarePlan.Status.PENDING);
         createOrder(otherPatient, provider, CarePlan.Status.COMPLETED);
 
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .param("status", "pending")
                         .param("patient_id", matchingPatient.getId().toString())
                         .param("provider_id", provider.getId().toString()))
@@ -152,17 +152,17 @@ class OrderControllerGetIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/orders - rejects non-positive patient_id")
+    @DisplayName("GET /api/v1/orders - rejects non-positive patient_id")
     void shouldRejectNonPositivePatientId() throws Exception {
-        mockMvc.perform(get("/api/orders").param("patient_id", "0"))
+        mockMvc.perform(get("/api/v1/orders").param("patient_id", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PATIENT_ID"));
     }
 
     @Test
-    @DisplayName("GET /api/orders - invalid status returns 400")
+    @DisplayName("GET /api/v1/orders - invalid status returns 400")
     void shouldRejectInvalidStatus() throws Exception {
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .param("status", "unknown"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_STATUS"));

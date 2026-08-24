@@ -68,7 +68,7 @@ class OrderControllerDownloadIntegrationTest {
         String carePlanText = "Problem list: Need for rapid immunomodulation";
         Long orderId = createOrderWithCarePlan(CarePlan.Status.COMPLETED, carePlanText);
 
-        mockMvc.perform(get("/api/orders/{id}/careplan/download", orderId))
+        mockMvc.perform(get("/api/v1/orders/{id}/careplan/download", orderId))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/plain"))
                 .andExpect(header().string("Content-Disposition",
@@ -83,7 +83,7 @@ class OrderControllerDownloadIntegrationTest {
                 CarePlan.Status.PENDING, CarePlan.Status.PROCESSING, CarePlan.Status.FAILED}) {
             Long orderId = createOrderWithCarePlan(statusValue, null);
 
-            mockMvc.perform(get("/api/orders/{id}/careplan/download", orderId))
+            mockMvc.perform(get("/api/v1/orders/{id}/careplan/download", orderId))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.error").value("CarePlan not yet generated"));
         }
@@ -92,7 +92,7 @@ class OrderControllerDownloadIntegrationTest {
     @Test
     @DisplayName("GET CarePlan download - unknown order returns 404")
     void shouldReturnNotFoundForUnknownOrder() throws Exception {
-        mockMvc.perform(get("/api/orders/{id}/careplan/download", 99999))
+        mockMvc.perform(get("/api/v1/orders/{id}/careplan/download", 99999))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
     }

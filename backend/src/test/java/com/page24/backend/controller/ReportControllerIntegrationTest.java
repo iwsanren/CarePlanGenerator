@@ -73,7 +73,7 @@ class ReportControllerIntegrationTest {
         createOrder("Bob", "Lee", "100002", "Humira", CarePlan.Status.PENDING,
                 LocalDateTime.of(2026, 8, 6, 9, 0));
 
-        mockMvc.perform(get("/api/reports/orders/export")
+        mockMvc.perform(get("/api/v1/reports/orders/export")
                         .param("format", "csv")
                         .param("status", "completed")
                         .param("start_date", "2026-08-01")
@@ -91,14 +91,14 @@ class ReportControllerIntegrationTest {
 
     @Test
     void returnsHeaderOnlyCsvWhenNoOrdersMatch() throws Exception {
-        mockMvc.perform(get("/api/reports/orders/export").param("status", "FAILED"))
+        mockMvc.perform(get("/api/v1/reports/orders/export").param("status", "FAILED"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"Order ID\"")));
     }
 
     @Test
     void rejectsInvalidDateRange() throws Exception {
-        mockMvc.perform(get("/api/reports/orders/export")
+        mockMvc.perform(get("/api/v1/reports/orders/export")
                         .param("start_date", "2026-08-31")
                         .param("end_date", "2026-08-01"))
                 .andExpect(status().isBadRequest())
@@ -107,7 +107,7 @@ class ReportControllerIntegrationTest {
 
     @Test
     void rejectsUnsupportedFormat() throws Exception {
-        mockMvc.perform(get("/api/reports/orders/export").param("format", "xlsx"))
+        mockMvc.perform(get("/api/v1/reports/orders/export").param("format", "xlsx"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_EXPORT_FORMAT"));
     }

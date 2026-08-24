@@ -59,9 +59,9 @@ class OrderControllerPostIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/orders - 正常创建返回 201")
+    @DisplayName("POST /api/v1/orders - 正常创建返回 201")
     void shouldCreateOrderSuccessfully() throws Exception {
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("IVIG", false)))
                 .andExpect(status().isCreated())
@@ -70,14 +70,14 @@ class OrderControllerPostIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/orders - Provider NPI冲突返回 409")
+    @DisplayName("POST /api/v1/orders - Provider NPI冲突返回 409")
     void shouldReturnConflictWhenProviderNpiSameButNameDiffers() throws Exception {
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("MED-1", false)))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("Brian", "Lee", "223344", "1988-07-21", "Dr. Brown", "1111111111", "MED-2", false)))
                 .andExpect(status().isConflict())
@@ -87,16 +87,16 @@ class OrderControllerPostIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/orders - 同患者同药同天返回 409")
+    @DisplayName("POST /api/v1/orders - 同患者同药同天返回 409")
     void shouldReturnConflictForSamePatientMedicationSameDay() throws Exception {
         String body = validRequestJson("DUP_DRUG_SAME_DAY", false);
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
@@ -106,11 +106,11 @@ class OrderControllerPostIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/orders - 跨天同药 confirm=false 返回 200 warning")
+    @DisplayName("POST /api/v1/orders - 跨天同药 confirm=false 返回 200 warning")
     void shouldReturnWarningForCrossDayDuplicateWhenConfirmFalse() throws Exception {
         String medication = "HISTORICAL_DUP_DRUG";
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson(medication, true)))
                 .andExpect(status().isCreated());
@@ -119,7 +119,7 @@ class OrderControllerPostIntegrationTest {
         firstOrder.setCreatedAt(LocalDateTime.now().minusDays(1));
         orderRepository.save(firstOrder);
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson(medication, false)))
                 .andExpect(status().isOk())
@@ -130,11 +130,11 @@ class OrderControllerPostIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/orders - 跨天同药 confirm=true 放行 201")
+    @DisplayName("POST /api/v1/orders - 跨天同药 confirm=true 放行 201")
     void shouldAllowCrossDayDuplicateWhenConfirmTrue() throws Exception {
         String medication = "HISTORICAL_DUP_DRUG_ALLOW";
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson(medication, true)))
                 .andExpect(status().isCreated());
@@ -143,7 +143,7 @@ class OrderControllerPostIntegrationTest {
         firstOrder.setCreatedAt(LocalDateTime.now().minusDays(1));
         orderRepository.save(firstOrder);
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson(medication, true)))
                 .andExpect(status().isCreated())

@@ -19,26 +19,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
+@RequestMapping("/api/v1/providers")
 @RequiredArgsConstructor
 public class ProviderController {
 
     private final ProviderService providerService;
 
-    @PostMapping("/providers")
-    public ResponseEntity<ProviderResponse> createProvider(@Valid @RequestBody CreateProviderRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(providerService.createProvider(request));
-    }
-
-    @PostMapping({"/api/v1/providers", "/api/v1/providers/"})
+    @PostMapping({"", "/"})
     public ResponseEntity<ProviderResponse> createProviderV1(@Valid @RequestBody CreateProviderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(providerService.createProvider(request));
     }
 
-    @GetMapping({"/api/v1/providers", "/api/v1/providers/"})
+    @GetMapping({"", "/"})
     public ResponseEntity<PagedProviderResponse> getProviders(
             @RequestParam(defaultValue = "1") int page,
             HttpServletRequest request
@@ -49,17 +46,17 @@ public class ProviderController {
         return ResponseEntity.ok(providerService.getProviders(page, baseUrl));
     }
 
-    @GetMapping({"/api/v1/providers/by-id/{id}", "/api/v1/providers/by-id/{id}/"})
+    @GetMapping({"/by-id/{id}", "/by-id/{id}/"})
     public ResponseEntity<ProviderResponse> getProviderById(@PathVariable Long id) {
         return ResponseEntity.ok(providerService.getProviderById(id));
     }
 
-    @GetMapping({"/api/v1/providers/by-npi/{npi}", "/api/v1/providers/by-npi/{npi}/"})
+    @GetMapping({"/by-npi/{npi}", "/by-npi/{npi}/"})
     public ResponseEntity<ProviderResponse> getProviderByNpi(@PathVariable String npi) {
         return ResponseEntity.ok(providerService.getProviderByNpi(npi));
     }
 
-    @PutMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    @PutMapping({"/{id}", "/{id}/"})
     public ResponseEntity<ProviderResponse> updateProvider(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProviderRequest request
@@ -67,7 +64,7 @@ public class ProviderController {
         return ResponseEntity.ok(providerService.updateProvider(id, request));
     }
 
-    @PatchMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    @PatchMapping({"/{id}", "/{id}/"})
     public ResponseEntity<ProviderResponse> patchProvider(
             @PathVariable Long id,
             @Valid @RequestBody PatchProviderRequest request
@@ -75,7 +72,7 @@ public class ProviderController {
         return ResponseEntity.ok(providerService.patchProvider(id, request));
     }
 
-    @DeleteMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    @DeleteMapping({"/{id}", "/{id}/"})
     public ResponseEntity<Void> deleteProvider(@PathVariable Long id) {
         providerService.deleteProvider(id);
         return ResponseEntity.noContent().build();

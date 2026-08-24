@@ -72,7 +72,7 @@ class OrderControllerErrorResponseTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
@@ -100,7 +100,7 @@ class OrderControllerErrorResponseTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
@@ -120,7 +120,7 @@ class OrderControllerErrorResponseTest {
                   "patientLastName": "Wong",
                 """;
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(malformedBody))
                 .andExpect(status().isBadRequest())

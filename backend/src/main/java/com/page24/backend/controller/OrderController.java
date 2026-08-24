@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
  * 不做任何业务判断，不直接操作数据库，不知道 Redis 是什么。
  */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
 public class OrderController {
 

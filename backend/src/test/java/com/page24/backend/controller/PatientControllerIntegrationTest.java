@@ -67,9 +67,9 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /patients - creates patient with 201")
+    @DisplayName("POST /api/v1/patients - creates patient with 201")
     void shouldCreatePatient() throws Exception {
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("001234")))
                 .andExpect(status().isCreated())
@@ -88,9 +88,9 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /patients - invalid MRN returns 400")
+    @DisplayName("POST /api/v1/patients - invalid MRN returns 400")
     void shouldRejectInvalidMrn() throws Exception {
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("1234")))
                 .andExpect(status().isBadRequest())
@@ -99,9 +99,9 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /patients - non-positive weight returns 400")
+    @DisplayName("POST /api/v1/patients - non-positive weight returns 400")
     void shouldRejectNonPositiveWeight() throws Exception {
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson("001234", 0)))
                 .andExpect(status().isBadRequest())
@@ -110,7 +110,7 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /patients - duplicate name and DOB returns 409")
+    @DisplayName("POST /api/v1/patients - duplicate name and DOB returns 409")
     void shouldReturnConflictForDuplicateNameAndDob() throws Exception {
         Patient existingPatient = new Patient();
         existingPatient.setFirstName("John");
@@ -124,7 +124,7 @@ class PatientControllerIntegrationTest {
         existingPatient.setAdditionalDiagnoses(List.of("I10"));
         existingPatient = patientRepository.save(existingPatient);
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("001234")))
                 .andExpect(status().isConflict())
@@ -133,7 +133,7 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients/{id} - returns patient details, history, and order summaries")
+    @DisplayName("GET /api/v1/patients/{id} - returns patient details, history, and order summaries")
     void shouldGetPatientById() throws Exception {
         Patient patient = new Patient();
         patient.setFirstName("John");
@@ -164,7 +164,7 @@ class PatientControllerIntegrationTest {
         carePlan.setStatus(CarePlan.Status.COMPLETED);
         carePlanRepository.save(carePlan);
 
-        mockMvc.perform(get("/patients/{id}", patient.getId()))
+        mockMvc.perform(get("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(patient.getId()))
                 .andExpect(jsonPath("$.first_name").value("John"))
@@ -184,22 +184,22 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients/{id} - returns 404 when patient does not exist")
+    @DisplayName("GET /api/v1/patients/{id} - returns 404 when patient does not exist")
     void shouldReturnNotFoundForUnknownPatient() throws Exception {
-        mockMvc.perform(get("/patients/{id}", 99999L))
+        mockMvc.perform(get("/api/v1/patients/{id}", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Patient not found"))
                 .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test
-    @DisplayName("GET /patients - returns a paginated summary response")
+    @DisplayName("GET /api/v1/patients - returns a paginated summary response")
     void shouldGetPatientsWithPagination() throws Exception {
         createPatient("John", "Smith", "001234");
         createPatient("Jane", "Smith", "001235");
         createPatient("Alex", "Jones", "001236");
 
-        mockMvc.perform(get("/patients")
+        mockMvc.perform(get("/api/v1/patients")
                         .param("page", "1")
                         .param("page_size", "2"))
                 .andExpect(status().isOk())
@@ -216,12 +216,12 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients - searches first and last name without case sensitivity")
+    @DisplayName("GET /api/v1/patients - searches first and last name without case sensitivity")
     void shouldSearchPatientsByName() throws Exception {
         createPatient("John", "Smith", "001234");
         createPatient("Jane", "Adams", "001235");
 
-        mockMvc.perform(get("/patients").param("search", "sMi"))
+        mockMvc.perform(get("/api/v1/patients").param("search", "sMi"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.results.length()").value(1))
@@ -230,11 +230,11 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients - returns an empty page when no patient matches search")
+    @DisplayName("GET /api/v1/patients - returns an empty page when no patient matches search")
     void shouldReturnEmptyPageForNoSearchMatches() throws Exception {
         createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(get("/patients").param("search", "NotFound"))
+        mockMvc.perform(get("/api/v1/patients").param("search", "NotFound"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(0))
                 .andExpect(jsonPath("$.page").value(1))
@@ -243,26 +243,26 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients - rejects invalid pagination values")
+    @DisplayName("GET /api/v1/patients - rejects invalid pagination values")
     void shouldRejectInvalidPaginationValues() throws Exception {
-        mockMvc.perform(get("/patients").param("page", "0"))
+        mockMvc.perform(get("/api/v1/patients").param("page", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PAGE"));
 
-        mockMvc.perform(get("/patients").param("page_size", "0"))
+        mockMvc.perform(get("/api/v1/patients").param("page_size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
     }
 
     @Test
-    @DisplayName("PUT /patients/{id} - partially updates patient and returns updated_at")
+    @DisplayName("PUT /api/v1/patients/{id} - partially updates patient and returns updated_at")
     void shouldUpdatePatient() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
         patient.setWeightKg(72.0);
         patient.setAllergies("None known");
         patient = patientRepository.saveAndFlush(patient);
 
-        mockMvc.perform(put("/patients/{id}", patient.getId())
+        mockMvc.perform(put("/api/v1/patients/{id}", patient.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -285,11 +285,11 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /patients/{id} - rejects invalid weight")
+    @DisplayName("PUT /api/v1/patients/{id} - rejects invalid weight")
     void shouldRejectInvalidUpdateWeight() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(put("/patients/{id}", patient.getId())
+        mockMvc.perform(put("/api/v1/patients/{id}", patient.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"weight_kg\": 0 }"))
                 .andExpect(status().isBadRequest())
@@ -298,11 +298,11 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /patients/{id} - rejects requests containing MRN")
+    @DisplayName("PUT /api/v1/patients/{id} - rejects requests containing MRN")
     void shouldRejectMrnModification() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(put("/patients/{id}", patient.getId())
+        mockMvc.perform(put("/api/v1/patients/{id}", patient.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"mrn\": \"009999\" }"))
                 .andExpect(status().isBadRequest())
@@ -311,11 +311,11 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /patients/{id} - rejects MRN even when its value is null")
+    @DisplayName("PUT /api/v1/patients/{id} - rejects MRN even when its value is null")
     void shouldRejectNullMrnModification() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(put("/patients/{id}", patient.getId())
+        mockMvc.perform(put("/api/v1/patients/{id}", patient.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"mrn\": null }"))
                 .andExpect(status().isBadRequest())
@@ -323,9 +323,9 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /patients/{id} - returns 404 for unknown patient")
+    @DisplayName("PUT /api/v1/patients/{id} - returns 404 for unknown patient")
     void shouldReturnNotFoundWhenUpdatingUnknownPatient() throws Exception {
-        mockMvc.perform(put("/patients/{id}", 99999L)
+        mockMvc.perform(put("/api/v1/patients/{id}", 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"weight_kg\": 75 }"))
                 .andExpect(status().isNotFound())
@@ -333,13 +333,13 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("DELETE /patients/{id} - rejects deletion when an order is pending")
+    @DisplayName("DELETE /api/v1/patients/{id} - rejects deletion when an order is pending")
     void shouldRejectDeletionWhenPatientHasPendingOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
         Order order = createOrder(patient, "IVIG");
         createCarePlan(order, CarePlan.Status.PENDING);
 
-        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+        mockMvc.perform(delete("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("Cannot delete patient with active orders"))
                 .andExpect(jsonPath("$.active_orders[0]").value(order.getId()));
@@ -348,19 +348,19 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("DELETE /patients/{id} - rejects deletion when an order is processing")
+    @DisplayName("DELETE /api/v1/patients/{id} - rejects deletion when an order is processing")
     void shouldRejectDeletionWhenPatientHasProcessingOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
         Order order = createOrder(patient, "IVIG");
         createCarePlan(order, CarePlan.Status.PROCESSING);
 
-        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+        mockMvc.perform(delete("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.active_orders[0]").value(order.getId()));
     }
 
     @Test
-    @DisplayName("DELETE /patients/{id} - deletes completed and failed order history with the patient")
+    @DisplayName("DELETE /api/v1/patients/{id} - deletes completed and failed order history with the patient")
     void shouldDeletePatientAndInactiveOrderHistory() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
         Order completedOrder = createOrder(patient, "IVIG");
@@ -368,7 +368,7 @@ class PatientControllerIntegrationTest {
         createCarePlan(completedOrder, CarePlan.Status.COMPLETED);
         createCarePlan(failedOrder, CarePlan.Status.FAILED);
 
-        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+        mockMvc.perform(delete("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isNoContent());
 
         org.junit.jupiter.api.Assertions.assertFalse(patientRepository.existsById(patient.getId()));
@@ -379,26 +379,26 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("DELETE /patients/{id} - deletes a patient with no orders")
+    @DisplayName("DELETE /api/v1/patients/{id} - deletes a patient with no orders")
     void shouldDeletePatientWithNoOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(delete("/patients/{id}", patient.getId()))
+        mockMvc.perform(delete("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isNoContent());
 
         org.junit.jupiter.api.Assertions.assertFalse(patientRepository.existsById(patient.getId()));
     }
 
     @Test
-    @DisplayName("DELETE /patients/{id} - returns 404 for an unknown patient")
+    @DisplayName("DELETE /api/v1/patients/{id} - returns 404 for an unknown patient")
     void shouldReturnNotFoundWhenDeletingUnknownPatient() throws Exception {
-        mockMvc.perform(delete("/patients/{id}", 99999L))
+        mockMvc.perform(delete("/api/v1/patients/{id}", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Patient not found"));
     }
 
     @Test
-    @DisplayName("GET /patients/{id}/orders - returns all order summaries for the patient")
+    @DisplayName("GET /api/v1/patients/{id}/orders - returns all order summaries for the patient")
     void shouldGetPatientOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
         Order completedOrder = createOrder(patient, "IVIG");
@@ -406,7 +406,7 @@ class PatientControllerIntegrationTest {
         createCarePlan(completedOrder, CarePlan.Status.COMPLETED);
         createCarePlan(pendingOrder, CarePlan.Status.PENDING);
 
-        mockMvc.perform(get("/patients/{id}/orders", patient.getId()))
+        mockMvc.perform(get("/api/v1/patients/{id}/orders", patient.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.patient_id").value(patient.getId()))
                 .andExpect(jsonPath("$.patient_name").value("John Smith"))
@@ -421,11 +421,11 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients/{id}/orders - returns an empty order collection for a patient with no orders")
+    @DisplayName("GET /api/v1/patients/{id}/orders - returns an empty order collection for a patient with no orders")
     void shouldReturnEmptyOrdersForPatientWithNoOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
 
-        mockMvc.perform(get("/patients/{id}/orders", patient.getId()))
+        mockMvc.perform(get("/api/v1/patients/{id}/orders", patient.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.patient_id").value(patient.getId()))
                 .andExpect(jsonPath("$.patient_name").value("John Smith"))
@@ -433,9 +433,9 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /patients/{id}/orders - returns 404 for an unknown patient")
+    @DisplayName("GET /api/v1/patients/{id}/orders - returns 404 for an unknown patient")
     void shouldReturnNotFoundForUnknownPatientOrders() throws Exception {
-        mockMvc.perform(get("/patients/{id}/orders", 99999L))
+        mockMvc.perform(get("/api/v1/patients/{id}/orders", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Patient not found"));
     }

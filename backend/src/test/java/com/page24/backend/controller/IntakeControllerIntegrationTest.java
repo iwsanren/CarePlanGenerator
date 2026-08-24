@@ -62,9 +62,9 @@ class IntakeControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/intake/clinic-b - success + pending + enqueue")
+    @DisplayName("POST /api/v1/intake/clinic-b - success + pending + enqueue")
     void shouldCreateOrderFromClinicB() throws Exception {
-        mockMvc.perform(post("/api/intake/clinic-b")
+        mockMvc.perform(post("/api/v1/intake/clinic-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clinicJson("IVIG", "1111111111", "123456", "G70.00")))
                 .andExpect(status().isCreated())
@@ -75,9 +75,9 @@ class IntakeControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/intake/pharma-corp - success + pending + enqueue")
+    @DisplayName("POST /api/v1/intake/pharma-corp - success + pending + enqueue")
     void shouldCreateOrderFromPharmaCorp() throws Exception {
-        mockMvc.perform(post("/api/intake/pharma-corp")
+        mockMvc.perform(post("/api/v1/intake/pharma-corp")
                         .contentType(MediaType.APPLICATION_XML)
                         .content(pharmaXml("Octagam", "5678901234", "345678", "G70.01")))
                 .andExpect(status().isCreated())
@@ -88,9 +88,9 @@ class IntakeControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/intake/hospital-d - success + pending + enqueue")
+    @DisplayName("POST /api/v1/intake/hospital-d - success + pending + enqueue")
     void shouldCreateOrderFromHospitalD() throws Exception {
-        mockMvc.perform(post("/api/intake/hospital-d")
+        mockMvc.perform(post("/api/v1/intake/hospital-d")
                         .contentType("text/csv")
                         .content(hospitalDCsv("Privigen", "1122334455", "456789", "G70.00")))
                 .andExpect(status().isCreated())
@@ -103,7 +103,7 @@ class IntakeControllerIntegrationTest {
     @Test
     @DisplayName("intake validation - invalid NPI should return 400")
     void shouldReturnValidationErrorForInvalidNpi() throws Exception {
-        mockMvc.perform(post("/api/intake/clinic-b")
+        mockMvc.perform(post("/api/v1/intake/clinic-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clinicJson("IVIG", "12345", "123456", "G70.00")))
                 .andExpect(status().isBadRequest())
@@ -116,12 +116,12 @@ class IntakeControllerIntegrationTest {
     @Test
     @DisplayName("intake duplicate block - cross source same day should return 409")
     void shouldBlockSameDayDuplicateAcrossSources() throws Exception {
-        mockMvc.perform(post("/api/intake/clinic-b")
+        mockMvc.perform(post("/api/v1/intake/clinic-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clinicJson("GAMUNEX", "1111111111", "777777", "G70.00")))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/intake/pharma-corp")
+        mockMvc.perform(post("/api/v1/intake/pharma-corp")
                         .contentType(MediaType.APPLICATION_XML)
                         .content(pharmaXml("GAMUNEX", "1111111111", "777777", "G70.00")))
                 .andExpect(status().isConflict())
@@ -134,7 +134,7 @@ class IntakeControllerIntegrationTest {
     void shouldReturnWarningThenAllowWhenConfirmTrue() throws Exception {
         String medication = "HISTORY_MED";
 
-        mockMvc.perform(post("/api/intake/clinic-b")
+        mockMvc.perform(post("/api/v1/intake/clinic-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clinicJson(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isCreated());
@@ -143,14 +143,14 @@ class IntakeControllerIntegrationTest {
         firstOrder.setCreatedAt(LocalDateTime.now().minusDays(1));
         orderRepository.save(firstOrder);
 
-        mockMvc.perform(post("/api/intake/pharma-corp")
+        mockMvc.perform(post("/api/v1/intake/pharma-corp")
                         .contentType(MediaType.APPLICATION_XML)
                         .content(pharmaXml(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("warning"))
                 .andExpect(jsonPath("$.code").value("POTENTIAL_DUPLICATE_ORDER_CROSS_DAY"));
 
-        mockMvc.perform(post("/api/intake/pharma-corp?confirm=true")
+        mockMvc.perform(post("/api/v1/intake/pharma-corp?confirm=true")
                         .contentType(MediaType.APPLICATION_XML)
                         .content(pharmaXml(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isCreated())

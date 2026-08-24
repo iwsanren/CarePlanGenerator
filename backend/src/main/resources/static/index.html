@@ -282,7 +282,7 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:8080/api/orders';
+        const API_BASE_URL = 'http://localhost:8080/api/v1/orders';
 
         // Day 6: 用于存储当前的轮询定时器，方便停止
         let pollingTimer = null;
@@ -346,7 +346,7 @@
         });
 
         // Day 6: Polling 核心函数
-        // 每 3 秒调用 GET /api/orders/{id}/status
+        // 每 3 秒调用 GET /api/v1/orders/{id}/status
         // completed 或 failed 时停止
         function startPolling(orderId) {
             const loading = document.getElementById('loading');

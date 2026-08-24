@@ -65,7 +65,7 @@ class OrderControllerStatusIntegrationTest {
     void shouldReturnProcessingStatus() throws Exception {
         Long orderId = createOrderWithCarePlan(CarePlan.Status.PROCESSING, null, null);
 
-        mockMvc.perform(get("/api/orders/{id}/status", orderId))
+        mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.order_id").value(orderId))
                 .andExpect(jsonPath("$.status").value("processing"))
@@ -82,7 +82,7 @@ class OrderControllerStatusIntegrationTest {
                 null
         );
 
-        mockMvc.perform(get("/api/orders/{id}/status", orderId))
+        mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.order_id").value(orderId))
                 .andExpect(jsonPath("$.status").value("completed"))
@@ -99,7 +99,7 @@ class OrderControllerStatusIntegrationTest {
                 "LLM service unavailable"
         );
 
-        mockMvc.perform(get("/api/orders/{id}/status", orderId))
+        mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.order_id").value(orderId))
                 .andExpect(jsonPath("$.status").value("failed"))
@@ -110,7 +110,7 @@ class OrderControllerStatusIntegrationTest {
     @Test
     @DisplayName("GET status - unknown order returns 404")
     void shouldReturnNotFoundWhenOrderDoesNotExist() throws Exception {
-        mockMvc.perform(get("/api/orders/{id}/status", 99999))
+        mockMvc.perform(get("/api/v1/orders/{id}/status", 99999))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
     }
