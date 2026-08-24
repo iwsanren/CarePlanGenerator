@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -72,5 +73,11 @@ public class ProviderController {
             @Valid @RequestBody PatchProviderRequest request
     ) {
         return ResponseEntity.ok(providerService.patchProvider(id, request));
+    }
+
+    @DeleteMapping({"/api/v1/providers/{id}", "/api/v1/providers/{id}/"})
+    public ResponseEntity<Void> deleteProvider(@PathVariable Long id) {
+        providerService.deleteProvider(id);
+        return ResponseEntity.noContent().build();
     }
 }

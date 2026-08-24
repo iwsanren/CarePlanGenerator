@@ -12,6 +12,8 @@ import com.page24.backend.exception.ProviderNpiConflictException;
 import com.page24.backend.exception.ProviderNpiNotFoundException;
 import com.page24.backend.exception.ProviderNotFoundException;
 import com.page24.backend.exception.ProviderPatchValidationException;
+import com.page24.backend.exception.ProviderHasOrdersException;
+import com.page24.backend.repository.OrderRepository;
 import com.page24.backend.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -20,6 +22,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ProviderService {
@@ -27,6 +31,7 @@ public class ProviderService {
     private static final int PROVIDER_LIST_PAGE_SIZE = 20;
 
     private final ProviderRepository providerRepository;
+    private final OrderRepository orderRepository;
     private final ProviderMapper providerMapper;
 
     @Transactional
@@ -141,6 +146,19 @@ public class ProviderService {
         }
 
         return providerMapper.toResponse(providerRepository.saveAndFlush(provider));
+    }
+
+    @Transactional
+    public void deleteProvider(Long id) {
+        Provider provider = providerRepository.findById(id)
+                .orElseThrow(ProviderNotFoundException::new);
+
+        List<Long> associatedOrderIds = orderRepository.findIdsByProviderId(id);
+        if (!associatedOrderIds.isEmpty()) {
+            throw new ProviderHasOrdersException(associatedOrderIds);
+        }
+
+        providerRepository.delete(provider);
     }
 
     private void validateNonNullPatchFields(PatchProviderRequest request) {

@@ -1,6 +1,8 @@
 package com.page24.backend.controller;
 
 import com.page24.backend.entity.CarePlan;
+import com.page24.backend.entity.Order;
+import com.page24.backend.entity.Patient;
 import com.page24.backend.entity.Provider;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
@@ -23,6 +25,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -377,11 +381,55 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.details.npi").value("NPI must be exactly 10 digits"));
     }
 
+    @Test
+    @DisplayName("DELETE /api/v1/providers/{id} - deletes Provider and returns 204 with no body")
+    void shouldDeleteProvider() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+
+        mockMvc.perform(delete("/api/v1/providers/{id}/", provider.getId()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        mockMvc.perform(get("/api/v1/providers/by-id/{id}/", provider.getId()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/providers/{id} - rejects deletion when Orders reference the Provider")
+    void shouldRejectDeletingProviderWithAssociatedOrders() throws Exception {
+        Provider provider = saveProvider("Dr. Jane Wilson", "1234567890");
+        Order order = saveOrderForProvider(provider);
+
+        mockMvc.perform(delete("/api/v1/providers/{id}/", provider.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value(
+                        "Provider cannot be deleted because it is associated with existing orders"
+                ))
+                .andExpect(jsonPath("$.order_ids[0]").value(order.getId()));
+
+        mockMvc.perform(get("/api/v1/providers/by-id/{id}/", provider.getId()))
+                .andExpect(status().isOk());
+    }
+
     private Provider saveProvider(String name, String npi) {
         Provider provider = new Provider();
         provider.setName(name);
         provider.setNpi(npi);
         return providerRepository.save(provider);
+    }
+
+    private Order saveOrderForProvider(Provider provider) {
+        Patient patient = new Patient();
+        patient.setFirstName("John");
+        patient.setLastName("Doe");
+        patient.setMrn("123456");
+        patient = patientRepository.save(patient);
+
+        Order order = new Order();
+        order.setPatient(patient);
+        order.setProvider(provider);
+        order.setMedicationName("IVIG");
+        return orderRepository.save(order);
     }
 
     private String requestJson(String name, String npi) {

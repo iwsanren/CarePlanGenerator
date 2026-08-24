@@ -65,5 +65,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Patient patient,
             String medicationName
     );
+
+    @Query("select o.id from Order o where o.provider.id = :providerId order by o.id")
+    List<Long> findIdsByProviderId(@Param("providerId") Long providerId);
 }
 

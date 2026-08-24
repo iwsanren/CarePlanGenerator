@@ -72,4 +72,12 @@ public class ProviderExceptionHandler {
                 "details", Map.of(ex.getField(), ex.getMessage())
         ));
     }
+
+    @ExceptionHandler(ProviderHasOrdersException.class)
+    public ResponseEntity<Map<String, Object>> handleProviderHasOrders(ProviderHasOrdersException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", ex.getMessage(),
+                "order_ids", ex.getOrderIds()
+        ));
+    }
 }
