@@ -13,6 +13,7 @@ import com.page24.backend.dto.UpdatePatientRequest;
 import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.entity.Patient;
 import com.page24.backend.exception.PatientDuplicateException;
+import com.page24.backend.exception.PatientMrnNotFoundException;
 import com.page24.backend.exception.PatientNotFoundException;
 import com.page24.backend.exception.PatientMrnModificationException;
 import com.page24.backend.exception.PatientHasActiveOrdersException;
@@ -203,6 +204,19 @@ public class PatientService {
     public PatientDetailResponse getPatientById(Long id) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(PatientNotFoundException::new);
+
+        return toPatientDetailResponse(patient);
+    }
+
+    @Transactional(readOnly = true)
+    public PatientDetailResponse getPatientByMrn(String mrn) {
+        Patient patient = patientRepository.findByMrn(mrn)
+                .orElseThrow(PatientMrnNotFoundException::new);
+
+        return toPatientDetailResponse(patient);
+    }
+
+    private PatientDetailResponse toPatientDetailResponse(Patient patient) {
 
         List<Order> orders = orderRepository.findByPatient(patient).stream()
                 .sorted(Comparator.comparing(Order::getCreatedAt,

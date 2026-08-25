@@ -49,6 +49,14 @@ public class PatientController {
         return ResponseEntity.ok(patientService.getPatientById(id));
     }
 
+    @GetMapping("/by-mrn/{mrn}")
+    public ResponseEntity<PatientDetailResponse> getPatientByMrn(@PathVariable String mrn) {
+        if (!mrn.matches("\\d{6}")) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(patientService.getPatientByMrn(mrn));
+    }
+
     @GetMapping("/{id}/orders")
     public ResponseEntity<PatientOrdersResponse> getPatientOrders(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getPatientOrders(id));

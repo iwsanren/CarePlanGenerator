@@ -193,6 +193,36 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/patients/by-mrn/{mrn} - returns patient details for a six-digit MRN")
+    void shouldGetPatientByMrn() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(get("/api/v1/patients/by-mrn/{mrn}", patient.getMrn()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(patient.getId()))
+                .andExpect(jsonPath("$.first_name").value("John"))
+                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.mrn").value("001234"))
+                .andExpect(jsonPath("$.date_of_birth").value("1979-06-08"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients/by-mrn/{mrn} - returns reference-compatible 404 for an unknown MRN")
+    void shouldReturnReferenceCompatibleNotFoundForUnknownMrn() throws Exception {
+        mockMvc.perform(get("/api/v1/patients/by-mrn/{mrn}", "999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Patient not found"))
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients/by-mrn/{mrn} - rejects an MRN that is not six digits")
+    void shouldRejectInvalidMrnPath() throws Exception {
+        mockMvc.perform(get("/api/v1/patients/by-mrn/{mrn}", "12345"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("GET /api/v1/patients - returns a paginated summary response")
     void shouldGetPatientsWithPagination() throws Exception {
         createPatient("John", "Smith", "001234");
