@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -220,6 +221,57 @@ class PatientControllerIntegrationTest {
     void shouldRejectInvalidMrnPath() throws Exception {
         mockMvc.perform(get("/api/v1/patients/by-mrn/{mrn}", "12345"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients/{id}/history - returns reverse-chronological raw order history")
+    void shouldGetPatientHistory() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        Order olderOrder = createOrder(patient, "IVIG");
+        olderOrder.setCreatedAt(LocalDateTime.of(2026, 8, 20, 9, 0));
+        olderOrder = orderRepository.saveAndFlush(olderOrder);
+
+        Order newerOrder = createOrder(patient, "Rituximab");
+        newerOrder.setCreatedAt(LocalDateTime.of(2026, 8, 21, 9, 0));
+        newerOrder = orderRepository.saveAndFlush(newerOrder);
+        createCarePlan(newerOrder, CarePlan.Status.COMPLETED);
+
+        mockMvc.perform(get("/api/v1/patients/{id}/history", patient.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(newerOrder.getId()))
+                .andExpect(jsonPath("$[0].patient_mrn").value("001234"))
+                .andExpect(jsonPath("$[0].patient_name").value("John Smith"))
+                .andExpect(jsonPath("$[0].provider_npi").value("1234567890"))
+                .andExpect(jsonPath("$[0].provider_name").value("Dr. Jane Wilson"))
+                .andExpect(jsonPath("$[0].medication_name").value("Rituximab"))
+                .andExpect(jsonPath("$[0].status").value("completed"))
+                .andExpect(jsonPath("$[0].has_care_plan").value(true))
+                .andExpect(jsonPath("$[0].created_at").exists())
+                .andExpect(jsonPath("$[1].id").value(olderOrder.getId()))
+                .andExpect(jsonPath("$[1].status").value("pending"))
+                .andExpect(jsonPath("$[1].has_care_plan").value(false));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients/{id}/history - returns an empty raw array when the patient has no orders")
+    void shouldReturnEmptyPatientHistory() throws Exception {
+        Patient patient = createPatient("John", "Smith", "001234");
+
+        mockMvc.perform(get("/api/v1/patients/{id}/history", patient.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients/{id}/history - returns 404 when the patient does not exist")
+    void shouldReturnNotFoundForUnknownPatientHistory() throws Exception {
+        mockMvc.perform(get("/api/v1/patients/{id}/history", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Patient not found"));
     }
 
     @Test

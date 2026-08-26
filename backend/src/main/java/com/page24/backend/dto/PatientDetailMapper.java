@@ -46,14 +46,37 @@ public class PatientDetailMapper {
         PatientOrderSummaryResponse response = new PatientOrderSummaryResponse();
         response.setId(order.getId());
         response.setMedicationName(order.getMedicationName());
-        response.setStatus(carePlan == null
-                ? CarePlan.Status.PENDING.name().toLowerCase(Locale.ROOT)
-                : carePlan.getStatus().name().toLowerCase(Locale.ROOT));
+        response.setStatus(toStatus(carePlan));
 
         if (order.getCreatedAt() != null) {
             response.setCreatedAt(order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant());
         }
 
         return response;
+    }
+
+    public PatientHistoryOrderResponse toHistoryResponse(Order order, CarePlan carePlan) {
+        Patient patient = order.getPatient();
+        PatientHistoryOrderResponse response = new PatientHistoryOrderResponse();
+        response.setId(order.getId());
+        response.setPatientMrn(patient.getMrn());
+        response.setPatientName(String.format("%s %s", patient.getFirstName(), patient.getLastName()).trim());
+        response.setProviderNpi(order.getProvider().getNpi());
+        response.setProviderName(order.getProvider().getName());
+        response.setMedicationName(order.getMedicationName());
+        response.setStatus(toStatus(carePlan));
+        response.setHasCarePlan(carePlan != null);
+
+        if (order.getCreatedAt() != null) {
+            response.setCreatedAt(order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant());
+        }
+
+        return response;
+    }
+
+    private String toStatus(CarePlan carePlan) {
+        return carePlan == null
+                ? CarePlan.Status.PENDING.name().toLowerCase(Locale.ROOT)
+                : carePlan.getStatus().name().toLowerCase(Locale.ROOT);
     }
 }

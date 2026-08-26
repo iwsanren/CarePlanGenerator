@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByPatient(Patient patient);
+    List<Order> findByPatientOrderByCreatedAtDesc(Patient patient);
 
     @Query(value = """
             select o

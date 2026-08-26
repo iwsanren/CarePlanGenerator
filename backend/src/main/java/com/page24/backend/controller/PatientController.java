@@ -2,6 +2,7 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.CreatePatientRequest;
 import com.page24.backend.dto.PatientDetailResponse;
+import com.page24.backend.dto.PatientHistoryOrderResponse;
 import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.dto.PatientResponse;
 import com.page24.backend.dto.UpdatePatientRequest;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/patients")
@@ -60,6 +63,11 @@ public class PatientController {
     @GetMapping("/{id}/orders")
     public ResponseEntity<PatientOrdersResponse> getPatientOrders(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getPatientOrders(id));
+    }
+
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<PatientHistoryOrderResponse>> getPatientHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(patientService.getPatientHistory(id));
     }
 
     @PutMapping("/{id}")

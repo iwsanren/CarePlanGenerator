@@ -4,6 +4,7 @@ import com.page24.backend.dto.CreatePatientRequest;
 import com.page24.backend.dto.PatientMapper;
 import com.page24.backend.dto.PatientDetailMapper;
 import com.page24.backend.dto.PatientDetailResponse;
+import com.page24.backend.dto.PatientHistoryOrderResponse;
 import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.entity.CarePlan;
@@ -198,6 +199,19 @@ public class PatientService {
         String patientName = String.format("%s %s", patient.getFirstName(), patient.getLastName()).trim();
 
         return new PatientOrdersResponse(patient.getId(), patientName, orderSummaries);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PatientHistoryOrderResponse> getPatientHistory(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(PatientNotFoundException::new);
+
+        List<Order> orders = orderRepository.findByPatientOrderByCreatedAtDesc(patient);
+        Map<Long, CarePlan> carePlansByOrderId = findCarePlansByOrderId(orders);
+
+        return orders.stream()
+                .map(order -> patientDetailMapper.toHistoryResponse(order, carePlansByOrderId.get(order.getId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
