@@ -29,8 +29,11 @@ public class PatientResponse {
 
     private String allergies;
 
-    @JsonProperty("primary_diagnosis")
+    @JsonProperty("primary_diagnosis_code")
     private String primaryDiagnosis;
+
+    @JsonProperty("primary_diagnosis_description")
+    private String primaryDiagnosisDescription;
 
     @JsonProperty("additional_diagnoses")
     private List<String> additionalDiagnoses;

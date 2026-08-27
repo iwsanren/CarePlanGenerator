@@ -68,8 +68,8 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/patients - creates patient with 201")
-    void shouldCreatePatient() throws Exception {
+    @DisplayName("POST /api/v1/patients - accepts optional demographics and returns reference field names")
+    void shouldCreatePatientWithOptionalDemographics() throws Exception {
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson("001234")))
@@ -82,10 +82,62 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.sex").value("Female"))
                 .andExpect(jsonPath("$.weight_kg").value(72.0))
                 .andExpect(jsonPath("$.allergies").value("None known"))
-                .andExpect(jsonPath("$.primary_diagnosis").value("G70.00"))
+                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.primary_diagnosis_description")
+                        .value("Myasthenia gravis without acute exacerbation"))
+                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist())
                 .andExpect(jsonPath("$.additional_diagnoses[0]").value("I10"))
                 .andExpect(jsonPath("$.additional_diagnoses[1]").value("K21.0"))
                 .andExpect(jsonPath("$.created_at").exists());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/patients - creates patient from minimal reference-compatible request")
+    void shouldCreatePatientFromMinimalReferenceCompatibleRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "mrn": "001234",
+                                  "first_name": "John",
+                                  "last_name": "Smith",
+                                  "primary_diagnosis_code": "G70.00"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.mrn").value("001234"))
+                .andExpect(jsonPath("$.first_name").value("John"))
+                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.primary_diagnosis_description").isEmpty())
+                .andExpect(jsonPath("$.date_of_birth").isEmpty())
+                .andExpect(jsonPath("$.sex").isEmpty())
+                .andExpect(jsonPath("$.weight_kg").isEmpty())
+                .andExpect(jsonPath("$.allergies").isEmpty());
+
+        Patient savedPatient = patientRepository.findByMrn("001234").orElseThrow();
+        org.junit.jupiter.api.Assertions.assertNull(savedPatient.getDateOfBirth());
+        org.junit.jupiter.api.Assertions.assertNull(savedPatient.getWeightKg());
+        org.junit.jupiter.api.Assertions.assertEquals("G70.00", savedPatient.getPrimaryDiagnosis());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/patients - keeps legacy primary_diagnosis request compatibility")
+    void shouldAcceptLegacyPrimaryDiagnosisRequestField() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "mrn": "001234",
+                                  "first_name": "John",
+                                  "last_name": "Smith",
+                                  "primary_diagnosis": "G70.00"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist());
     }
 
     @Test
@@ -570,7 +622,8 @@ class PatientControllerIntegrationTest {
                   "sex": "Female",
                   "weight_kg": %d,
                   "allergies": "None known",
-                  "primary_diagnosis": "G70.00",
+                  "primary_diagnosis_code": "G70.00",
+                  "primary_diagnosis_description": "Myasthenia gravis without acute exacerbation",
                   "additional_diagnoses": ["I10", "K21.0"]
                 }
                 """, mrn, weightKg);

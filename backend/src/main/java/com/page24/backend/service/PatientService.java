@@ -77,6 +77,7 @@ public class PatientService {
         patient.setWeightKg(request.getWeightKg());
         patient.setAllergies(request.getAllergies());
         patient.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
+        patient.setPrimaryDiagnosisDescription(request.getPrimaryDiagnosisDescription());
         patient.setAdditionalDiagnoses(
                 request.getAdditionalDiagnoses() == null
                         ? new ArrayList<>()

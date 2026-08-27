@@ -39,6 +39,9 @@ public class Patient {
     @Column(name = "primary_diagnosis")
     private String primaryDiagnosis;
 
+    @Column(name = "primary_diagnosis_description", length = 500)
+    private String primaryDiagnosisDescription;
+
     @ElementCollection
     @CollectionTable(
             name = "patient_additional_diagnoses",

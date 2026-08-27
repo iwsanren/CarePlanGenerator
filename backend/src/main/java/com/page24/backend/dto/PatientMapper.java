@@ -19,6 +19,7 @@ public class PatientMapper {
         response.setWeightKg(patient.getWeightKg());
         response.setAllergies(patient.getAllergies());
         response.setPrimaryDiagnosis(patient.getPrimaryDiagnosis());
+        response.setPrimaryDiagnosisDescription(patient.getPrimaryDiagnosisDescription());
         response.setAdditionalDiagnoses(patient.getAdditionalDiagnoses());
 
         if (patient.getCreatedAt() != null) {
