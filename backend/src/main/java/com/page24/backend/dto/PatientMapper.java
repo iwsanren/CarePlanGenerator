@@ -35,11 +35,8 @@ public class PatientMapper {
         response.setFirstName(patient.getFirstName());
         response.setLastName(patient.getLastName());
         response.setMrn(patient.getMrn());
+        response.setFullName(String.format("%s %s", patient.getFirstName(), patient.getLastName()).trim());
         response.setPrimaryDiagnosis(patient.getPrimaryDiagnosis());
-
-        if (patient.getCreatedAt() != null) {
-            response.setCreatedAt(patient.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant());
-        }
 
         return response;
     }

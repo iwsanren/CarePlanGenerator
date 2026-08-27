@@ -3,8 +3,6 @@ package com.page24.backend.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-import java.time.Instant;
-
 /** Summary fields returned for each patient in GET /patients. */
 @Data
 public class PatientListItemResponse {
@@ -18,9 +16,9 @@ public class PatientListItemResponse {
 
     private String mrn;
 
-    @JsonProperty("primary_diagnosis")
-    private String primaryDiagnosis;
+    @JsonProperty("full_name")
+    private String fullName;
 
-    @JsonProperty("created_at")
-    private Instant createdAt;
+    @JsonProperty("primary_diagnosis_code")
+    private String primaryDiagnosis;
 }

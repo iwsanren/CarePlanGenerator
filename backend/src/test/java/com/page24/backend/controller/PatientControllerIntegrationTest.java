@@ -342,10 +342,14 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.page_size").value(2))
                 .andExpect(jsonPath("$.results.length()").value(2))
                 .andExpect(jsonPath("$.results[0].id").exists())
-                .andExpect(jsonPath("$.results[0].first_name").exists())
                 .andExpect(jsonPath("$.results[0].mrn").exists())
-                .andExpect(jsonPath("$.results[0].primary_diagnosis").value("G70.00"))
-                .andExpect(jsonPath("$.results[0].created_at").exists())
+                .andExpect(jsonPath("$.results[0].first_name").exists())
+                .andExpect(jsonPath("$.results[0].last_name").exists())
+                .andExpect(jsonPath("$.results[0].full_name").value("Alex Jones"))
+                .andExpect(jsonPath("$.results[0].primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.results[0].length()").value(6))
+                .andExpect(jsonPath("$.results[0].primary_diagnosis").doesNotExist())
+                .andExpect(jsonPath("$.results[0].created_at").doesNotExist())
                 .andExpect(jsonPath("$.results[0].date_of_birth").doesNotExist());
     }
 
