@@ -18,7 +18,7 @@ import com.page24.backend.exception.PatientMrnNotFoundException;
 import com.page24.backend.exception.PatientNotFoundException;
 import com.page24.backend.exception.PatientMrnModificationException;
 import com.page24.backend.exception.PatientHasActiveOrdersException;
-import com.page24.backend.exception.ValidationError;
+import com.page24.backend.exception.PatientListPageNotFoundException;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
 import com.page24.backend.repository.PatientRepository;
@@ -39,6 +39,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PatientService {
+
+    private static final int PATIENT_LIST_PAGE_SIZE = 20;
 
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
@@ -89,32 +91,24 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
-    public PagedPatientResponse getPatients(int page, int pageSize, String search) {
-        if (page < 1) {
-            throw new ValidationError("INVALID_PAGE", "page must be greater than or equal to 1");
-        }
-        if (pageSize < 1) {
-            throw new ValidationError("INVALID_PAGE_SIZE", "page_size must be greater than or equal to 1");
-        }
+    public PagedPatientResponse getPatients(String requestedPage, String baseUrl) {
+        int page = "last".equals(requestedPage.trim()) ? lastPage() : parsePage(requestedPage);
 
         PageRequest pageRequest = PageRequest.of(
                 page - 1,
-                pageSize,
-                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+                PATIENT_LIST_PAGE_SIZE,
+                Sort.by(Sort.Direction.ASC, "lastName").and(Sort.by(Sort.Direction.ASC, "firstName"))
         );
-        String normalizedSearch = normalizeBlankToNull(search);
-        Page<Patient> patients = normalizedSearch == null
-                ? patientRepository.findAll(pageRequest)
-                : patientRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-                        normalizedSearch,
-                        normalizedSearch,
-                        pageRequest
-                );
+        Page<Patient> patients = patientRepository.findAll(pageRequest);
+
+        if (page > 1 && patients.isEmpty()) {
+            throw new PatientListPageNotFoundException();
+        }
 
         return new PagedPatientResponse(
                 patients.getTotalElements(),
-                page,
-                pageSize,
+                patients.hasNext() ? pageUrl(baseUrl, page + 1) : null,
+                patients.hasPrevious() ? pageUrl(baseUrl, page - 1) : null,
                 patients.getContent().stream().map(patientMapper::toListItemResponse).toList()
         );
     }
@@ -254,11 +248,27 @@ public class PatientService {
         return patientDetailMapper.toResponse(patient, medicationHistory, orders, carePlansByOrderId);
     }
 
-    private String normalizeBlankToNull(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return null;
+    private int parsePage(String requestedPage) {
+        try {
+            int page = Integer.parseInt(requestedPage.trim());
+            if (page < 1) {
+                throw new PatientListPageNotFoundException();
+            }
+            return page;
+        } catch (NumberFormatException ex) {
+            throw new PatientListPageNotFoundException();
         }
-        return value.trim();
+    }
+
+    private String pageUrl(String baseUrl, int page) {
+        return baseUrl + "?page=" + page;
+    }
+
+    private int lastPage() {
+        long totalPatients = patientRepository.count();
+        return Math.max(1, Math.toIntExact(
+                (totalPatients + PATIENT_LIST_PAGE_SIZE - 1) / PATIENT_LIST_PAGE_SIZE
+        ));
     }
 
     private Map<Long, CarePlan> findCarePlansByOrderId(List<Order> orders) {

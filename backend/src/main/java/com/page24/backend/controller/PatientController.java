@@ -9,6 +9,7 @@ import com.page24.backend.dto.UpdatePatientRequest;
 import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.service.PatientService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 
@@ -40,11 +42,13 @@ public class PatientController {
 
     @GetMapping
     public ResponseEntity<PagedPatientResponse> getPatients(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String search
+            @RequestParam(defaultValue = "1") String page,
+            HttpServletRequest request
     ) {
-        return ResponseEntity.ok(patientService.getPatients(page, pageSize, search));
+        String baseUrl = ServletUriComponentsBuilder.fromRequest(request)
+                .replaceQuery(null)
+                .toUriString();
+        return ResponseEntity.ok(patientService.getPatients(page, baseUrl));
     }
 
     @GetMapping("/{id}")

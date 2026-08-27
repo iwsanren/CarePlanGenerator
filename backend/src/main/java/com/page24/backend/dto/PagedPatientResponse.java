@@ -1,6 +1,5 @@
 package com.page24.backend.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -11,10 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PagedPatientResponse {
     private long count;
-    private int page;
-
-    @JsonProperty("page_size")
-    private int pageSize;
-
+    private String next;
+    private String previous;
     private List<PatientListItemResponse> results;
 }

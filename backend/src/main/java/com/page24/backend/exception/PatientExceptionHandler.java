@@ -62,6 +62,12 @@ public class PatientExceptionHandler {
                 .body(Map.of("detail", ex.getMessage()));
     }
 
+    @ExceptionHandler(PatientListPageNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handlePatientListPageNotFound(PatientListPageNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("detail", ex.getMessage()));
+    }
+
     @ExceptionHandler(PatientMrnModificationException.class)
     public ResponseEntity<Map<String, Object>> handleMrnModification(PatientMrnModificationException ex) {
         Map<String, Object> body = new LinkedHashMap<>();

@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -327,69 +328,76 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/patients - returns a paginated summary response")
-    void shouldGetPatientsWithPagination() throws Exception {
-        createPatient("John", "Smith", "001234");
-        createPatient("Jane", "Smith", "001235");
-        createPatient("Alex", "Jones", "001236");
+    @DisplayName("GET /api/v1/patients - returns DRF-style fixed pagination links")
+    void shouldGetPatientsWithReferencePagination() throws Exception {
+        for (int index = 1; index <= 21; index++) {
+            createPatient("First%02d".formatted(index), "Last%02d".formatted(index), "10%04d".formatted(index));
+        }
 
-        mockMvc.perform(get("/api/v1/patients")
-                        .param("page", "1")
-                        .param("page_size", "2"))
+        mockMvc.perform(patientListRequest(null))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(3))
-                .andExpect(jsonPath("$.page").value(1))
-                .andExpect(jsonPath("$.page_size").value(2))
-                .andExpect(jsonPath("$.results.length()").value(2))
+                .andExpect(jsonPath("$.count").value(21))
+                .andExpect(jsonPath("$.next").value("http://localhost:8080/api/v1/patients?page=2"))
+                .andExpect(jsonPath("$.previous").isEmpty())
+                .andExpect(jsonPath("$.results.length()").value(20))
+                .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(jsonPath("$.results[0].id").exists())
-                .andExpect(jsonPath("$.results[0].mrn").exists())
-                .andExpect(jsonPath("$.results[0].first_name").exists())
-                .andExpect(jsonPath("$.results[0].last_name").exists())
-                .andExpect(jsonPath("$.results[0].full_name").value("Alex Jones"))
+                .andExpect(jsonPath("$.results[0].mrn").value("100001"))
+                .andExpect(jsonPath("$.results[0].first_name").value("First01"))
+                .andExpect(jsonPath("$.results[0].last_name").value("Last01"))
+                .andExpect(jsonPath("$.results[0].full_name").value("First01 Last01"))
                 .andExpect(jsonPath("$.results[0].primary_diagnosis_code").value("G70.00"))
                 .andExpect(jsonPath("$.results[0].length()").value(6))
-                .andExpect(jsonPath("$.results[0].primary_diagnosis").doesNotExist())
-                .andExpect(jsonPath("$.results[0].created_at").doesNotExist())
-                .andExpect(jsonPath("$.results[0].date_of_birth").doesNotExist());
-    }
+                .andExpect(jsonPath("$.page").doesNotExist())
+                .andExpect(jsonPath("$.page_size").doesNotExist());
 
-    @Test
-    @DisplayName("GET /api/v1/patients - searches first and last name without case sensitivity")
-    void shouldSearchPatientsByName() throws Exception {
-        createPatient("John", "Smith", "001234");
-        createPatient("Jane", "Adams", "001235");
-
-        mockMvc.perform(get("/api/v1/patients").param("search", "sMi"))
+        mockMvc.perform(patientListRequest(2))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.count").value(21))
+                .andExpect(jsonPath("$.next").isEmpty())
+                .andExpect(jsonPath("$.previous").value("http://localhost:8080/api/v1/patients?page=1"))
                 .andExpect(jsonPath("$.results.length()").value(1))
-                .andExpect(jsonPath("$.results[0].first_name").value("John"))
-                .andExpect(jsonPath("$.results[0].last_name").value("Smith"));
-    }
+                .andExpect(jsonPath("$.results[0].last_name").value("Last21"));
 
-    @Test
-    @DisplayName("GET /api/v1/patients - returns an empty page when no patient matches search")
-    void shouldReturnEmptyPageForNoSearchMatches() throws Exception {
-        createPatient("John", "Smith", "001234");
-
-        mockMvc.perform(get("/api/v1/patients").param("search", "NotFound"))
+        mockMvc.perform(patientListRequest("last"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(0))
-                .andExpect(jsonPath("$.page").value(1))
-                .andExpect(jsonPath("$.page_size").value(20))
-                .andExpect(jsonPath("$.results.length()").value(0));
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].last_name").value("Last21"));
     }
 
     @Test
-    @DisplayName("GET /api/v1/patients - rejects invalid pagination values")
-    void shouldRejectInvalidPaginationValues() throws Exception {
-        mockMvc.perform(get("/api/v1/patients").param("page", "0"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PAGE"));
+    @DisplayName("GET /api/v1/patients - ignores unsupported search and page_size query parameters")
+    void shouldIgnoreUnsupportedListQueryParameters() throws Exception {
+        createPatient("Zoe", "Adams", "001234");
+        createPatient("Amy", "Adams", "001235");
+        createPatient("John", "Smith", "001236");
 
-        mockMvc.perform(get("/api/v1/patients").param("page_size", "0"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
+        mockMvc.perform(patientListRequest(1)
+                        .param("search", "sMi")
+                        .param("page_size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(3))
+                .andExpect(jsonPath("$.results.length()").value(3))
+                .andExpect(jsonPath("$.results[0].first_name").value("Amy"))
+                .andExpect(jsonPath("$.results[1].first_name").value("Zoe"))
+                .andExpect(jsonPath("$.results[2].first_name").value("John"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/patients - returns DRF-style 404 for invalid page values")
+    void shouldReturnReferenceCompatibleInvalidPageResponse() throws Exception {
+        mockMvc.perform(get("/api/v1/patients").param("page", "0"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Invalid page."));
+
+        mockMvc.perform(get("/api/v1/patients").param("page", "not-a-number"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Invalid page."));
+
+        createPatient("John", "Smith", "001234");
+        mockMvc.perform(patientListRequest(2))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Invalid page."));
     }
 
     @Test
@@ -631,5 +639,18 @@ class PatientControllerIntegrationTest {
                   "additional_diagnoses": ["I10", "K21.0"]
                 }
                 """, mrn, weightKg);
+    }
+
+    private MockHttpServletRequestBuilder patientListRequest(Object page) {
+        MockHttpServletRequestBuilder requestBuilder = get("/api/v1/patients");
+        if (page != null) {
+            requestBuilder.param("page", page.toString());
+        }
+        return requestBuilder.with(request -> {
+                    request.setServerName("localhost");
+                    request.setServerPort(8080);
+                    request.setScheme("http");
+                    return request;
+                });
     }
 }
