@@ -4,8 +4,12 @@ import com.page24.backend.entity.Patient;
 import com.page24.backend.entity.Provider;
 import com.page24.backend.entity.Order;
 import com.page24.backend.entity.CarePlan;
+import com.page24.backend.entity.MedicationHistory;
+import com.page24.backend.entity.PatientDiagnosis;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.repository.MedicationHistoryRepository;
 import com.page24.backend.repository.OrderRepository;
+import com.page24.backend.repository.PatientDiagnosisRepository;
 import com.page24.backend.repository.PatientRepository;
 import com.page24.backend.repository.ProviderRepository;
 import com.page24.backend.service.DataInitializationService;
@@ -52,6 +56,12 @@ class PatientControllerIntegrationTest {
     private PatientRepository patientRepository;
 
     @Autowired
+    private PatientDiagnosisRepository patientDiagnosisRepository;
+
+    @Autowired
+    private MedicationHistoryRepository medicationHistoryRepository;
+
+    @Autowired
     private ProviderRepository providerRepository;
 
     @MockitoBean
@@ -64,6 +74,8 @@ class PatientControllerIntegrationTest {
     void cleanDatabase() {
         carePlanRepository.deleteAll();
         orderRepository.deleteAll();
+        medicationHistoryRepository.deleteAll();
+        patientDiagnosisRepository.deleteAll();
         patientRepository.deleteAll();
         providerRepository.deleteAll();
     }
@@ -187,7 +199,7 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/patients/{id} - returns patient details, history, and order summaries")
+    @DisplayName("GET /api/v1/patients/{id} - returns the reference-compatible detail representation")
     void shouldGetPatientById() throws Exception {
         Patient patient = new Patient();
         patient.setFirstName("John");
@@ -198,43 +210,67 @@ class PatientControllerIntegrationTest {
         patient.setWeightKg(72.0);
         patient.setAllergies("None known");
         patient.setPrimaryDiagnosis("G70.00");
+        patient.setPrimaryDiagnosisDescription("Myasthenia gravis without acute exacerbation");
         patient.setAdditionalDiagnoses(new ArrayList<>(List.of("I10", "K21.0")));
         patient = patientRepository.save(patient);
 
-        Provider provider = new Provider();
-        provider.setName("Dr. Jane Wilson");
-        provider.setNpi("1234567890");
-        provider = providerRepository.save(provider);
+        PatientDiagnosis primaryDiagnosis = new PatientDiagnosis();
+        primaryDiagnosis.setPatient(patient);
+        primaryDiagnosis.setIcd10Code("G70.00");
+        primaryDiagnosis.setDescription("Myasthenia gravis without acute exacerbation");
+        primaryDiagnosis.setPrimary(true);
+        primaryDiagnosis = patientDiagnosisRepository.save(primaryDiagnosis);
 
-        Order order = new Order();
-        order.setPatient(patient);
-        order.setProvider(provider);
-        order.setMedicationName("IVIG");
-        order.setMedicationHistory("Pyridostigmine 60mg\nPrednisone 10mg\nPyridostigmine 60mg");
-        order = orderRepository.save(order);
+        PatientDiagnosis secondaryDiagnosis = new PatientDiagnosis();
+        secondaryDiagnosis.setPatient(patient);
+        secondaryDiagnosis.setIcd10Code("I10");
+        secondaryDiagnosis.setDescription("Essential hypertension");
+        secondaryDiagnosis.setPrimary(false);
+        patientDiagnosisRepository.save(secondaryDiagnosis);
 
-        CarePlan carePlan = new CarePlan();
-        carePlan.setOrder(order);
-        carePlan.setStatus(CarePlan.Status.COMPLETED);
-        carePlanRepository.save(carePlan);
+        MedicationHistory medicationHistory = new MedicationHistory();
+        medicationHistory.setPatient(patient);
+        medicationHistory.setMedicationName("Pyridostigmine");
+        medicationHistory.setDosage("60 mg");
+        medicationHistory.setFrequency("PO q6h PRN");
+        medicationHistory.setCurrent(true);
+        medicationHistory = medicationHistoryRepository.save(medicationHistory);
 
         mockMvc.perform(get("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(patient.getId()))
                 .andExpect(jsonPath("$.first_name").value("John"))
                 .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.full_name").value("John Smith"))
                 .andExpect(jsonPath("$.mrn").value("001234"))
                 .andExpect(jsonPath("$.date_of_birth").value("1979-06-08"))
+                .andExpect(jsonPath("$.sex").value("Female"))
                 .andExpect(jsonPath("$.weight_kg").value(72.0))
-                .andExpect(jsonPath("$.additional_diagnoses[0]").value("I10"))
-                .andExpect(jsonPath("$.medication_history[0]").value("Pyridostigmine 60mg"))
-                .andExpect(jsonPath("$.medication_history[1]").value("Prednisone 10mg"))
-                .andExpect(jsonPath("$.medication_history.length()").value(2))
-                .andExpect(jsonPath("$.orders[0].id").value(order.getId()))
-                .andExpect(jsonPath("$.orders[0].medication_name").value("IVIG"))
-                .andExpect(jsonPath("$.orders[0].status").value("completed"))
-                .andExpect(jsonPath("$.orders[0].created_at").exists())
-                .andExpect(jsonPath("$.created_at").exists());
+                .andExpect(jsonPath("$.allergies").value("None known"))
+                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.primary_diagnosis_description")
+                        .value("Myasthenia gravis without acute exacerbation"))
+                .andExpect(jsonPath("$.diagnoses.length()").value(2))
+                .andExpect(jsonPath("$.diagnoses[0].id").value(primaryDiagnosis.getId()))
+                .andExpect(jsonPath("$.diagnoses[0].icd10_code").value("G70.00"))
+                .andExpect(jsonPath("$.diagnoses[0].description")
+                        .value("Myasthenia gravis without acute exacerbation"))
+                .andExpect(jsonPath("$.diagnoses[0].is_primary").value(true))
+                .andExpect(jsonPath("$.diagnoses[0].created_at").exists())
+                .andExpect(jsonPath("$.diagnoses[0].length()").value(5))
+                .andExpect(jsonPath("$.medication_history[0].id").value(medicationHistory.getId()))
+                .andExpect(jsonPath("$.medication_history[0].medication_name").value("Pyridostigmine"))
+                .andExpect(jsonPath("$.medication_history[0].dosage").value("60 mg"))
+                .andExpect(jsonPath("$.medication_history[0].frequency").value("PO q6h PRN"))
+                .andExpect(jsonPath("$.medication_history[0].is_current").value(true))
+                .andExpect(jsonPath("$.medication_history[0].created_at").exists())
+                .andExpect(jsonPath("$.medication_history[0].length()").value(6))
+                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist())
+                .andExpect(jsonPath("$.additional_diagnoses").doesNotExist())
+                .andExpect(jsonPath("$.orders").doesNotExist())
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.updated_at").exists())
+                .andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(15)));
     }
 
     @Test
@@ -525,14 +561,27 @@ class PatientControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/patients/{id} - deletes a patient with no orders")
+    @DisplayName("DELETE /api/v1/patients/{id} - deletes patient-owned detail resources with a patient that has no orders")
     void shouldDeletePatientWithNoOrders() throws Exception {
         Patient patient = createPatient("John", "Smith", "001234");
+
+        PatientDiagnosis diagnosis = new PatientDiagnosis();
+        diagnosis.setPatient(patient);
+        diagnosis.setIcd10Code("G70.00");
+        diagnosis.setPrimary(true);
+        patientDiagnosisRepository.save(diagnosis);
+
+        MedicationHistory medicationHistory = new MedicationHistory();
+        medicationHistory.setPatient(patient);
+        medicationHistory.setMedicationName("Pyridostigmine");
+        medicationHistoryRepository.save(medicationHistory);
 
         mockMvc.perform(delete("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isNoContent());
 
         org.junit.jupiter.api.Assertions.assertFalse(patientRepository.existsById(patient.getId()));
+        org.junit.jupiter.api.Assertions.assertTrue(patientDiagnosisRepository.findByPatientOrderByCreatedAtAsc(patient).isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(medicationHistoryRepository.findByPatientOrderByCreatedAtAsc(patient).isEmpty());
     }
 
     @Test

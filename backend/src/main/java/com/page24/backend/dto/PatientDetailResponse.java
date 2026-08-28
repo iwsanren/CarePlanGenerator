@@ -10,8 +10,8 @@ import java.util.List;
 /**
  * Response body for GET /patients/{id}.
  *
- * This is separate from PatientResponse because the list/create endpoints do
- * not need to expose a patient's medication history or order summaries.
+ * This is separate from PatientResponse because list/create endpoints do not
+ * need to expose a patient's diagnoses and medication history resources.
  */
 @Data
 public class PatientDetailResponse {
@@ -22,6 +22,9 @@ public class PatientDetailResponse {
 
     @JsonProperty("last_name")
     private String lastName;
+
+    @JsonProperty("full_name")
+    private String fullName;
 
     private String mrn;
 
@@ -35,17 +38,20 @@ public class PatientDetailResponse {
 
     private String allergies;
 
-    @JsonProperty("primary_diagnosis")
+    @JsonProperty("primary_diagnosis_code")
     private String primaryDiagnosis;
 
-    @JsonProperty("additional_diagnoses")
-    private List<String> additionalDiagnoses;
+    @JsonProperty("primary_diagnosis_description")
+    private String primaryDiagnosisDescription;
+
+    private List<PatientDiagnosisResponse> diagnoses;
 
     @JsonProperty("medication_history")
-    private List<String> medicationHistory;
-
-    private List<PatientOrderSummaryResponse> orders;
+    private List<MedicationHistoryResponse> medicationHistory;
 
     @JsonProperty("created_at")
     private Instant createdAt;
+
+    @JsonProperty("updated_at")
+    private Instant updatedAt;
 }

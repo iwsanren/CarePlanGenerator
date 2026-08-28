@@ -8,11 +8,13 @@ import com.page24.backend.dto.PatientHistoryOrderResponse;
 import com.page24.backend.dto.PagedPatientResponse;
 import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.entity.CarePlan;
+import com.page24.backend.entity.MedicationHistory;
 import com.page24.backend.entity.Order;
 import com.page24.backend.dto.PatientResponse;
 import com.page24.backend.dto.UpdatePatientRequest;
 import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.entity.Patient;
+import com.page24.backend.entity.PatientDiagnosis;
 import com.page24.backend.exception.PatientDuplicateException;
 import com.page24.backend.exception.PatientMrnNotFoundException;
 import com.page24.backend.exception.PatientNotFoundException;
@@ -20,7 +22,9 @@ import com.page24.backend.exception.PatientMrnModificationException;
 import com.page24.backend.exception.PatientHasActiveOrdersException;
 import com.page24.backend.exception.PatientListPageNotFoundException;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.repository.MedicationHistoryRepository;
 import com.page24.backend.repository.OrderRepository;
+import com.page24.backend.repository.PatientDiagnosisRepository;
 import com.page24.backend.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,7 +35,6 @@ import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +50,8 @@ public class PatientService {
     private final OrderRepository orderRepository;
     private final CarePlanRepository carePlanRepository;
     private final PatientDetailMapper patientDetailMapper;
+    private final PatientDiagnosisRepository patientDiagnosisRepository;
+    private final MedicationHistoryRepository medicationHistoryRepository;
 
     @Transactional
     public PatientResponse createPatient(CreatePatientRequest request) {
@@ -174,6 +179,9 @@ public class PatientService {
             orderRepository.flush();
         }
 
+        patientDiagnosisRepository.deleteByPatient(patient);
+        medicationHistoryRepository.deleteByPatient(patient);
+
         patientRepository.delete(patient);
     }
 
@@ -226,26 +234,9 @@ public class PatientService {
     }
 
     private PatientDetailResponse toPatientDetailResponse(Patient patient) {
-
-        List<Order> orders = orderRepository.findByPatient(patient).stream()
-                .sorted(Comparator.comparing(Order::getCreatedAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
-
-        Map<Long, CarePlan> carePlansByOrderId = findCarePlansByOrderId(orders);
-
-        List<String> medicationHistory = orders.stream()
-                .map(Order::getMedicationHistory)
-                .filter(history -> history != null && !history.isBlank())
-                .flatMap(history -> history.lines())
-                .map(String::trim)
-                .filter(history -> !history.isEmpty())
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toCollection(LinkedHashSet::new),
-                        ArrayList::new
-                ));
-
-        return patientDetailMapper.toResponse(patient, medicationHistory, orders, carePlansByOrderId);
+        List<PatientDiagnosis> diagnoses = patientDiagnosisRepository.findByPatientOrderByCreatedAtAsc(patient);
+        List<MedicationHistory> medicationHistory = medicationHistoryRepository.findByPatientOrderByCreatedAtAsc(patient);
+        return patientDetailMapper.toResponse(patient, diagnoses, medicationHistory);
     }
 
     private int parsePage(String requestedPage) {
