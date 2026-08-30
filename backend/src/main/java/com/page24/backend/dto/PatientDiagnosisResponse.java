@@ -10,14 +10,12 @@ public class PatientDiagnosisResponse {
 
     private Long id;
 
-    @JsonProperty("icd10_code")
     private String icd10Code;
 
     private String description;
 
-    @JsonProperty("is_primary")
+    @JsonProperty("isPrimary")
     private boolean primary;
 
-    @JsonProperty("created_at")
     private Instant createdAt;
 }

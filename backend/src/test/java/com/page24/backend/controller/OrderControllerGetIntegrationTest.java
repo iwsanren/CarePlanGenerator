@@ -80,7 +80,7 @@ class OrderControllerGetIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(3))
                 .andExpect(jsonPath("$.page").value(1))
-                .andExpect(jsonPath("$.page_size").value(2))
+                .andExpect(jsonPath("$.pageSize").value(2))
                 .andExpect(jsonPath("$.results.length()").value(2));
     }
 
@@ -145,10 +145,10 @@ class OrderControllerGetIntegrationTest {
                         .param("provider_id", provider.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.results[0].patient_name").value("Alice Wong"))
-                .andExpect(jsonPath("$.results[0].medication_name").value("IVIG"))
+                .andExpect(jsonPath("$.results[0].patientName").value("Alice Wong"))
+                .andExpect(jsonPath("$.results[0].medicationName").value("IVIG"))
                 .andExpect(jsonPath("$.results[0].status").value("pending"))
-                .andExpect(jsonPath("$.results[0].created_at").exists());
+                .andExpect(jsonPath("$.results[0].createdAt").exists());
     }
 
     @Test

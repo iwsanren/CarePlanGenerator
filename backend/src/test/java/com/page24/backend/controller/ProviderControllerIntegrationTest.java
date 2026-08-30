@@ -77,8 +77,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.npi").value("1234567890"))
                 .andExpect(jsonPath("$.phone").isEmpty())
                 .andExpect(jsonPath("$.fax").isEmpty())
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -98,8 +98,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.npi").value("1234567890"))
                 .andExpect(jsonPath("$.phone").value("+1-555-0100"))
                 .andExpect(jsonPath("$.fax").value("+1-555-0101"))
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -183,7 +183,7 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.results[0].id").value(firstProvider.getId()))
                 .andExpect(jsonPath("$.results[0].npi").value("1111111111"))
                 .andExpect(jsonPath("$.results[0].name").value("Dr. Aaron Adams"))
-                .andExpect(jsonPath("$.results[0].created_at").doesNotExist())
+                .andExpect(jsonPath("$.results[0].createdAt").doesNotExist())
                 .andExpect(jsonPath("$.results[1].id").value(secondProvider.getId()))
                 .andExpect(jsonPath("$.results[1].name").value("Dr. Zoe Wilson"));
     }
@@ -227,8 +227,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
                 .andExpect(jsonPath("$.phone").value("+1-555-0100"))
                 .andExpect(jsonPath("$.fax").value("+1-555-0101"))
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -256,8 +256,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Dr. Jane Wilson"))
                 .andExpect(jsonPath("$.phone").value("+1-555-0100"))
                 .andExpect(jsonPath("$.fax").value("+1-555-0101"))
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -290,8 +290,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Dr. Jane M. Wilson"))
                 .andExpect(jsonPath("$.phone").value("+1-555-0199"))
                 .andExpect(jsonPath("$.fax").value("+1-555-0101"))
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -344,8 +344,8 @@ class ProviderControllerIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Dr. Jane M. Wilson"))
                 .andExpect(jsonPath("$.phone").value("+1-555-0200"))
                 .andExpect(jsonPath("$.fax").value("+1-555-0101"))
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test

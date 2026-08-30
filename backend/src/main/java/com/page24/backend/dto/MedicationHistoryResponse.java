@@ -10,16 +10,14 @@ public class MedicationHistoryResponse {
 
     private Long id;
 
-    @JsonProperty("medication_name")
     private String medicationName;
 
     private String dosage;
 
     private String frequency;
 
-    @JsonProperty("is_current")
+    @JsonProperty("isCurrent")
     private boolean current;
 
-    @JsonProperty("created_at")
     private Instant createdAt;
 }

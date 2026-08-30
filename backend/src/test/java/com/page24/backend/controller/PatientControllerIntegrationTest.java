@@ -88,20 +88,19 @@ class PatientControllerIntegrationTest {
                         .content(validRequestJson("001234")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.first_name").value("John"))
-                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
                 .andExpect(jsonPath("$.mrn").value("001234"))
-                .andExpect(jsonPath("$.date_of_birth").value("1979-06-08"))
+                .andExpect(jsonPath("$.dateOfBirth").value("1979-06-08"))
                 .andExpect(jsonPath("$.sex").value("Female"))
-                .andExpect(jsonPath("$.weight_kg").value(72.0))
+                .andExpect(jsonPath("$.weightKg").value(72.0))
                 .andExpect(jsonPath("$.allergies").value("None known"))
-                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
-                .andExpect(jsonPath("$.primary_diagnosis_description")
+                .andExpect(jsonPath("$.primaryDiagnosis").value("G70.00"))
+                .andExpect(jsonPath("$.primaryDiagnosisDescription")
                         .value("Myasthenia gravis without acute exacerbation"))
-                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist())
-                .andExpect(jsonPath("$.additional_diagnoses[0]").value("I10"))
-                .andExpect(jsonPath("$.additional_diagnoses[1]").value("K21.0"))
-                .andExpect(jsonPath("$.created_at").exists());
+                .andExpect(jsonPath("$.additionalDiagnoses[0]").value("I10"))
+                .andExpect(jsonPath("$.additionalDiagnoses[1]").value("K21.0"))
+                .andExpect(jsonPath("$.createdAt").exists());
     }
 
     @Test
@@ -112,21 +111,21 @@ class PatientControllerIntegrationTest {
                         .content("""
                                 {
                                   "mrn": "001234",
-                                  "first_name": "John",
-                                  "last_name": "Smith",
-                                  "primary_diagnosis_code": "G70.00"
+                                  "firstName": "John",
+                                  "lastName": "Smith",
+                                  "primaryDiagnosis": "G70.00"
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.mrn").value("001234"))
-                .andExpect(jsonPath("$.first_name").value("John"))
-                .andExpect(jsonPath("$.last_name").value("Smith"))
-                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
-                .andExpect(jsonPath("$.primary_diagnosis_description").isEmpty())
-                .andExpect(jsonPath("$.date_of_birth").isEmpty())
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
+                .andExpect(jsonPath("$.primaryDiagnosis").value("G70.00"))
+                .andExpect(jsonPath("$.primaryDiagnosisDescription").isEmpty())
+                .andExpect(jsonPath("$.dateOfBirth").isEmpty())
                 .andExpect(jsonPath("$.sex").isEmpty())
-                .andExpect(jsonPath("$.weight_kg").isEmpty())
+                .andExpect(jsonPath("$.weightKg").isEmpty())
                 .andExpect(jsonPath("$.allergies").isEmpty());
 
         Patient savedPatient = patientRepository.findByMrn("001234").orElseThrow();
@@ -143,14 +142,13 @@ class PatientControllerIntegrationTest {
                         .content("""
                                 {
                                   "mrn": "001234",
-                                  "first_name": "John",
-                                  "last_name": "Smith",
+                                  "firstName": "John",
+                                  "lastName": "Smith",
                                   "primary_diagnosis": "G70.00"
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
-                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist());
+                .andExpect(jsonPath("$.primaryDiagnosis").value("G70.00"));
     }
 
     @Test
@@ -239,37 +237,36 @@ class PatientControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/patients/{id}", patient.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(patient.getId()))
-                .andExpect(jsonPath("$.first_name").value("John"))
-                .andExpect(jsonPath("$.last_name").value("Smith"))
-                .andExpect(jsonPath("$.full_name").value("John Smith"))
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
+                .andExpect(jsonPath("$.fullName").value("John Smith"))
                 .andExpect(jsonPath("$.mrn").value("001234"))
-                .andExpect(jsonPath("$.date_of_birth").value("1979-06-08"))
+                .andExpect(jsonPath("$.dateOfBirth").value("1979-06-08"))
                 .andExpect(jsonPath("$.sex").value("Female"))
-                .andExpect(jsonPath("$.weight_kg").value(72.0))
+                .andExpect(jsonPath("$.weightKg").value(72.0))
                 .andExpect(jsonPath("$.allergies").value("None known"))
-                .andExpect(jsonPath("$.primary_diagnosis_code").value("G70.00"))
-                .andExpect(jsonPath("$.primary_diagnosis_description")
+                .andExpect(jsonPath("$.primaryDiagnosis").value("G70.00"))
+                .andExpect(jsonPath("$.primaryDiagnosisDescription")
                         .value("Myasthenia gravis without acute exacerbation"))
                 .andExpect(jsonPath("$.diagnoses.length()").value(2))
                 .andExpect(jsonPath("$.diagnoses[0].id").value(primaryDiagnosis.getId()))
-                .andExpect(jsonPath("$.diagnoses[0].icd10_code").value("G70.00"))
+                .andExpect(jsonPath("$.diagnoses[0].icd10Code").value("G70.00"))
                 .andExpect(jsonPath("$.diagnoses[0].description")
                         .value("Myasthenia gravis without acute exacerbation"))
-                .andExpect(jsonPath("$.diagnoses[0].is_primary").value(true))
-                .andExpect(jsonPath("$.diagnoses[0].created_at").exists())
+                .andExpect(jsonPath("$.diagnoses[0].isPrimary").value(true))
+                .andExpect(jsonPath("$.diagnoses[0].createdAt").exists())
                 .andExpect(jsonPath("$.diagnoses[0].length()").value(5))
-                .andExpect(jsonPath("$.medication_history[0].id").value(medicationHistory.getId()))
-                .andExpect(jsonPath("$.medication_history[0].medication_name").value("Pyridostigmine"))
-                .andExpect(jsonPath("$.medication_history[0].dosage").value("60 mg"))
-                .andExpect(jsonPath("$.medication_history[0].frequency").value("PO q6h PRN"))
-                .andExpect(jsonPath("$.medication_history[0].is_current").value(true))
-                .andExpect(jsonPath("$.medication_history[0].created_at").exists())
-                .andExpect(jsonPath("$.medication_history[0].length()").value(6))
-                .andExpect(jsonPath("$.primary_diagnosis").doesNotExist())
-                .andExpect(jsonPath("$.additional_diagnoses").doesNotExist())
+                .andExpect(jsonPath("$.medicationHistory[0].id").value(medicationHistory.getId()))
+                .andExpect(jsonPath("$.medicationHistory[0].medicationName").value("Pyridostigmine"))
+                .andExpect(jsonPath("$.medicationHistory[0].dosage").value("60 mg"))
+                .andExpect(jsonPath("$.medicationHistory[0].frequency").value("PO q6h PRN"))
+                .andExpect(jsonPath("$.medicationHistory[0].isCurrent").value(true))
+                .andExpect(jsonPath("$.medicationHistory[0].createdAt").exists())
+                .andExpect(jsonPath("$.medicationHistory[0].length()").value(6))
+                .andExpect(jsonPath("$.additionalDiagnoses").doesNotExist())
                 .andExpect(jsonPath("$.orders").doesNotExist())
-                .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.updated_at").exists())
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists())
                 .andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(15)));
     }
 
@@ -290,10 +287,10 @@ class PatientControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/patients/by-mrn/{mrn}", patient.getMrn()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(patient.getId()))
-                .andExpect(jsonPath("$.first_name").value("John"))
-                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
                 .andExpect(jsonPath("$.mrn").value("001234"))
-                .andExpect(jsonPath("$.date_of_birth").value("1979-06-08"));
+                .andExpect(jsonPath("$.dateOfBirth").value("1979-06-08"));
     }
 
     @Test
@@ -331,17 +328,17 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(newerOrder.getId()))
-                .andExpect(jsonPath("$[0].patient_mrn").value("001234"))
-                .andExpect(jsonPath("$[0].patient_name").value("John Smith"))
-                .andExpect(jsonPath("$[0].provider_npi").value("1234567890"))
-                .andExpect(jsonPath("$[0].provider_name").value("Dr. Jane Wilson"))
-                .andExpect(jsonPath("$[0].medication_name").value("Rituximab"))
+                .andExpect(jsonPath("$[0].patientMrn").value("001234"))
+                .andExpect(jsonPath("$[0].patientName").value("John Smith"))
+                .andExpect(jsonPath("$[0].providerNpi").value("1234567890"))
+                .andExpect(jsonPath("$[0].providerName").value("Dr. Jane Wilson"))
+                .andExpect(jsonPath("$[0].medicationName").value("Rituximab"))
                 .andExpect(jsonPath("$[0].status").value("completed"))
-                .andExpect(jsonPath("$[0].has_care_plan").value(true))
-                .andExpect(jsonPath("$[0].created_at").exists())
+                .andExpect(jsonPath("$[0].hasCarePlan").value(true))
+                .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[1].id").value(olderOrder.getId()))
                 .andExpect(jsonPath("$[1].status").value("pending"))
-                .andExpect(jsonPath("$[1].has_care_plan").value(false));
+                .andExpect(jsonPath("$[1].hasCarePlan").value(false));
     }
 
     @Test
@@ -379,13 +376,13 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(jsonPath("$.results[0].id").exists())
                 .andExpect(jsonPath("$.results[0].mrn").value("100001"))
-                .andExpect(jsonPath("$.results[0].first_name").value("First01"))
-                .andExpect(jsonPath("$.results[0].last_name").value("Last01"))
-                .andExpect(jsonPath("$.results[0].full_name").value("First01 Last01"))
-                .andExpect(jsonPath("$.results[0].primary_diagnosis_code").value("G70.00"))
+                .andExpect(jsonPath("$.results[0].firstName").value("First01"))
+                .andExpect(jsonPath("$.results[0].lastName").value("Last01"))
+                .andExpect(jsonPath("$.results[0].fullName").value("First01 Last01"))
+                .andExpect(jsonPath("$.results[0].primaryDiagnosis").value("G70.00"))
                 .andExpect(jsonPath("$.results[0].length()").value(6))
                 .andExpect(jsonPath("$.page").doesNotExist())
-                .andExpect(jsonPath("$.page_size").doesNotExist());
+                .andExpect(jsonPath("$.pageSize").doesNotExist());
 
         mockMvc.perform(patientListRequest(2))
                 .andExpect(status().isOk())
@@ -393,12 +390,12 @@ class PatientControllerIntegrationTest {
                 .andExpect(jsonPath("$.next").isEmpty())
                 .andExpect(jsonPath("$.previous").value("http://localhost:8080/api/v1/patients?page=1"))
                 .andExpect(jsonPath("$.results.length()").value(1))
-                .andExpect(jsonPath("$.results[0].last_name").value("Last21"));
+                .andExpect(jsonPath("$.results[0].lastName").value("Last21"));
 
         mockMvc.perform(patientListRequest("last"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results.length()").value(1))
-                .andExpect(jsonPath("$.results[0].last_name").value("Last21"));
+                .andExpect(jsonPath("$.results[0].lastName").value("Last21"));
     }
 
     @Test
@@ -414,9 +411,9 @@ class PatientControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(3))
                 .andExpect(jsonPath("$.results.length()").value(3))
-                .andExpect(jsonPath("$.results[0].first_name").value("Amy"))
-                .andExpect(jsonPath("$.results[1].first_name").value("Zoe"))
-                .andExpect(jsonPath("$.results[2].first_name").value("John"));
+                .andExpect(jsonPath("$.results[0].firstName").value("Amy"))
+                .andExpect(jsonPath("$.results[1].firstName").value("Zoe"))
+                .andExpect(jsonPath("$.results[2].firstName").value("John"));
     }
 
     @Test
@@ -448,18 +445,18 @@ class PatientControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "weight_kg": 75,
+                                  "weightKg": 75,
                                   "allergies": "Penicillin"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(patient.getId()))
-                .andExpect(jsonPath("$.first_name").value("John"))
-                .andExpect(jsonPath("$.last_name").value("Smith"))
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
                 .andExpect(jsonPath("$.mrn").value("001234"))
-                .andExpect(jsonPath("$.weight_kg").value(75.0))
+                .andExpect(jsonPath("$.weightKg").value(75.0))
                 .andExpect(jsonPath("$.allergies").value("Penicillin"))
-                .andExpect(jsonPath("$.updated_at").exists());
+                .andExpect(jsonPath("$.updatedAt").exists());
 
         Patient reloadedPatient = patientRepository.findById(patient.getId()).orElseThrow();
         org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(1979, 6, 8), reloadedPatient.getDateOfBirth());
@@ -473,7 +470,7 @@ class PatientControllerIntegrationTest {
 
         mockMvc.perform(put("/api/v1/patients/{id}", patient.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"weight_kg\": 0 }"))
+                        .content("{ \"weightKg\": 0 }"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Validation failed"))
                 .andExpect(jsonPath("$.details.weight_kg").value("weight_kg must be greater than 0"));
@@ -509,7 +506,7 @@ class PatientControllerIntegrationTest {
     void shouldReturnNotFoundWhenUpdatingUnknownPatient() throws Exception {
         mockMvc.perform(put("/api/v1/patients/{id}", 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"weight_kg\": 75 }"))
+                        .content("{ \"weightKg\": 75 }"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Patient not found"));
     }
@@ -603,16 +600,16 @@ class PatientControllerIntegrationTest {
 
         mockMvc.perform(get("/api/v1/patients/{id}/orders", patient.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.patient_id").value(patient.getId()))
-                .andExpect(jsonPath("$.patient_name").value("John Smith"))
+                .andExpect(jsonPath("$.patientId").value(patient.getId()))
+                .andExpect(jsonPath("$.patientName").value("John Smith"))
                 .andExpect(jsonPath("$.orders.length()").value(2))
                 .andExpect(jsonPath("$.orders[0].id").value(pendingOrder.getId()))
-                .andExpect(jsonPath("$.orders[0].medication_name").value("Rituximab"))
+                .andExpect(jsonPath("$.orders[0].medicationName").value("Rituximab"))
                 .andExpect(jsonPath("$.orders[0].status").value("pending"))
                 .andExpect(jsonPath("$.orders[1].id").value(completedOrder.getId()))
-                .andExpect(jsonPath("$.orders[1].medication_name").value("IVIG"))
+                .andExpect(jsonPath("$.orders[1].medicationName").value("IVIG"))
                 .andExpect(jsonPath("$.orders[1].status").value("completed"))
-                .andExpect(jsonPath("$.orders[0].created_at").exists());
+                .andExpect(jsonPath("$.orders[0].createdAt").exists());
     }
 
     @Test
@@ -622,8 +619,8 @@ class PatientControllerIntegrationTest {
 
         mockMvc.perform(get("/api/v1/patients/{id}/orders", patient.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.patient_id").value(patient.getId()))
-                .andExpect(jsonPath("$.patient_name").value("John Smith"))
+                .andExpect(jsonPath("$.patientId").value(patient.getId()))
+                .andExpect(jsonPath("$.patientName").value("John Smith"))
                 .andExpect(jsonPath("$.orders.length()").value(0));
     }
 
@@ -676,16 +673,16 @@ class PatientControllerIntegrationTest {
     private String requestJson(String mrn, int weightKg) {
         return String.format("""
                 {
-                  "first_name": "John",
-                  "last_name": "Smith",
+                  "firstName": "John",
+                  "lastName": "Smith",
                   "mrn": "%s",
-                  "date_of_birth": "1979-06-08",
+                  "dateOfBirth": "1979-06-08",
                   "sex": "Female",
-                  "weight_kg": %d,
+                  "weightKg": %d,
                   "allergies": "None known",
-                  "primary_diagnosis_code": "G70.00",
-                  "primary_diagnosis_description": "Myasthenia gravis without acute exacerbation",
-                  "additional_diagnoses": ["I10", "K21.0"]
+                  "primaryDiagnosis": "G70.00",
+                  "primaryDiagnosisDescription": "Myasthenia gravis without acute exacerbation",
+                  "additionalDiagnoses": ["I10", "K21.0"]
                 }
                 """, mrn, weightKg);
     }

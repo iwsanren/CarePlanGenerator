@@ -1,7 +1,6 @@
 package com.page24.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
@@ -19,11 +18,9 @@ public class CreatePatientRequest {
     public static final String ICD10_REGEX = "^[A-Z][0-9][0-9A-Z](\\.[0-9A-Z]{1,4})?$";
 
     @NotBlank(message = "first_name is required")
-    @JsonProperty("first_name")
     private String firstName;
 
     @NotBlank(message = "last_name is required")
-    @JsonProperty("last_name")
     private String lastName;
 
     @NotBlank(message = "mrn is required")
@@ -31,29 +28,24 @@ public class CreatePatientRequest {
     private String mrn;
 
     @PastOrPresent(message = "date_of_birth cannot be in the future")
-    @JsonProperty("date_of_birth")
     private LocalDate dateOfBirth;
 
     private String sex;
 
     @Positive(message = "weight_kg must be greater than 0")
     @DecimalMax(value = "500", message = "weight_kg must be less than or equal to 500")
-    @JsonProperty("weight_kg")
     private Double weightKg;
 
     private String allergies;
 
     @NotBlank(message = "primary_diagnosis_code is required")
     @Pattern(regexp = ICD10_REGEX, message = "primary_diagnosis_code must be a valid ICD-10 code")
-    @JsonProperty("primary_diagnosis_code")
     @JsonAlias("primary_diagnosis")
     private String primaryDiagnosis;
 
     @Size(max = 500, message = "primary_diagnosis_description must be at most 500 characters")
-    @JsonProperty("primary_diagnosis_description")
     private String primaryDiagnosisDescription;
 
-    @JsonProperty("additional_diagnoses")
     private List<
             @Pattern(regexp = ICD10_REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")
             String

@@ -67,10 +67,10 @@ class OrderControllerStatusIntegrationTest {
 
         mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.order_id").value(orderId))
+                .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.status").value("processing"))
-                .andExpect(jsonPath("$.careplan_preview").doesNotExist())
-                .andExpect(jsonPath("$.error_message").doesNotExist());
+                .andExpect(jsonPath("$.carePlanPreview").doesNotExist())
+                .andExpect(jsonPath("$.errorMessage").doesNotExist());
     }
 
     @Test
@@ -84,10 +84,10 @@ class OrderControllerStatusIntegrationTest {
 
         mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.order_id").value(orderId))
+                .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.status").value("completed"))
-                .andExpect(jsonPath("$.careplan_preview").value("Problem list: Need for rapid immunomodulation..."))
-                .andExpect(jsonPath("$.error_message").doesNotExist());
+                .andExpect(jsonPath("$.carePlanPreview").value("Problem list: Need for rapid immunomodulation..."))
+                .andExpect(jsonPath("$.errorMessage").doesNotExist());
     }
 
     @Test
@@ -101,10 +101,10 @@ class OrderControllerStatusIntegrationTest {
 
         mockMvc.perform(get("/api/v1/orders/{id}/status", orderId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.order_id").value(orderId))
+                .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.status").value("failed"))
-                .andExpect(jsonPath("$.error_message").value("LLM service unavailable"))
-                .andExpect(jsonPath("$.careplan_preview").doesNotExist());
+                .andExpect(jsonPath("$.errorMessage").value("LLM service unavailable"))
+                .andExpect(jsonPath("$.carePlanPreview").doesNotExist());
     }
 
     @Test
