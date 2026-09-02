@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 
 /**
- * 数据初始化服务 - 用于生成 Mock Data
- * 这个服务在应用启动时自动运行，向数据库插入测试数据
+ * Initializes the database with mock data.
+ * Runs at application startup and inserts sample records for local testing.
  */
 @Service
 @Profile("!lambda")
@@ -35,7 +35,7 @@ public class DataInitializationService implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        // 检查是否已经有数据，如果有就不重复插入
+        // Avoid inserting the sample data more than once.
         if (patientRepository.count() > 0) {
             log.info("数据库已有数据，跳过初始化");
             return;
@@ -43,20 +43,20 @@ public class DataInitializationService implements CommandLineRunner {
 
         log.info("开始初始化 Mock Data...");
 
-        // 1. 创建 Providers（医生）
-        Provider provider1 = createProvider("李医生", "1234567890");
-        Provider provider2 = createProvider("王医生", "0987654321");
-        Provider provider3 = createProvider("张医生", "1122334455");
+        // 1. Create providers.
+        Provider provider1 = createProvider("Dr. Williams", "1234567890");
+        Provider provider2 = createProvider("Dr. Patel", "0987654321");
+        Provider provider3 = createProvider("Dr. Garcia", "1122334455");
 
-        // 2. 创建 Patients（病人）
-        Patient patient1 = createPatient("张", "三", "000001", LocalDate.of(1979, 6, 8));
-        Patient patient2 = createPatient("李", "四", "000002", LocalDate.of(1985, 3, 15));
-        Patient patient3 = createPatient("王", "五", "000003", LocalDate.of(1990, 11, 22));
-        Patient patient4 = createPatient("赵", "六", "000004", LocalDate.of(1975, 7, 30));
-        Patient patient5 = createPatient("陈", "七", "000005", LocalDate.of(1988, 2, 14));
+        // 2. Create patients.
+        Patient patient1 = createPatient("John", "Smith", "000001", LocalDate.of(1979, 6, 8));
+        Patient patient2 = createPatient("Emma", "Davis", "000002", LocalDate.of(1985, 3, 15));
+        Patient patient3 = createPatient("Michael", "Brown", "000003", LocalDate.of(1990, 11, 22));
+        Patient patient4 = createPatient("Sophia", "Wilson", "000004", LocalDate.of(1975, 7, 30));
+        Patient patient5 = createPatient("Daniel", "Taylor", "000005", LocalDate.of(1988, 2, 14));
 
-        // 3. 创建 Orders（订单）和对应的 Care Plans
-        // 订单1：张三 - 药物A - 已完成
+        // 3. Create orders and their corresponding Care Plans.
+        // Order 1: John Smith - IVIG - completed.
         Order order1 = createOrder(
             patient1,
             provider1,
@@ -68,7 +68,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order1, CarePlan.Status.COMPLETED, generateSampleCarePlan("IVIG"));
 
-        // 订单2：张三 - 药物B - 处理中
+        // Order 2: John Smith - Methotrexate - processing.
         Order order2 = createOrder(
             patient1,
             provider1,
@@ -80,7 +80,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order2, CarePlan.Status.PROCESSING, null);
 
-        // 订单3：李四 - 药物C - 等待中
+        // Order 3: Emma Davis - Humira - pending.
         Order order3 = createOrder(
             patient2,
             provider2,
@@ -92,7 +92,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order3, CarePlan.Status.PENDING, null);
 
-        // 订单4：王五 - 药物D - 已完成
+        // Order 4: Michael Brown - Enbrel - completed.
         Order order4 = createOrder(
             patient3,
             provider2,
@@ -104,7 +104,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order4, CarePlan.Status.COMPLETED, generateSampleCarePlan("Enbrel"));
 
-        // 订单5：赵六 - 药物E - 失败
+        // Order 5: Sophia Wilson - Remicade - failed.
         Order order5 = createOrder(
             patient4,
             provider3,
@@ -116,7 +116,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order5, CarePlan.Status.FAILED, null);
 
-        // 订单6：陈七 - 药物F - 等待中
+        // Order 6: Daniel Taylor - Ocrevus - pending.
         Order order6 = createOrder(
             patient5,
             provider3,
@@ -128,7 +128,7 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order6, CarePlan.Status.PENDING, null);
 
-        // 订单7：张三 - 药物G - 已完成（同一患者，不同药物）
+        // Order 7: John Smith - Prednisone - completed; same patient, different medication.
         Order order7 = createOrder(
             patient1,
             provider1,

@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Claude provider 实现：结构完整，可直接接真实 API。
- * 如果 key 未配置，会抛出清晰错误，方便定位配置问题。
+ * Claude provider implementation with the structure needed for a live API integration.
+ * Throws a clear error when the API key is missing, making configuration issues easy to diagnose.
  */
 @Service("claude")
 @Slf4j

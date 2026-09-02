@@ -34,17 +34,17 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * OrderService - 业务逻辑层
+ * OrderService - business logic layer.
  *
- * 职责：所有和"业务"相关的判断和操作
- *   - 找或创建 Patient / Provider
- *   - 创建 Order、创建 CarePlan
- *   - 把任务放进 Redis 队列
- *   - 搜索订单
- *   - 拼装下载文件内容
+ * Owns all business rules and operations, including:
+ *   - Finding or creating patients and providers.
+ *   - Creating orders and Care Plans.
+ *   - Enqueuing work in Redis.
+ *   - Searching orders.
+ *   - Building downloadable Care Plan content.
  *
- * 原来这些逻辑全部在 OrderController.java 里，现在搬到这里。
- * Controller 只需要调用 Service 的方法，拿到结果返回给前端。
+ * These responsibilities previously lived in OrderController.
+ * The controller now delegates to this service and returns its result to the frontend.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,15 +61,16 @@ public class OrderService {
     private final OrderMapper orderMapper;
 
     /**
-     * 创建订单：找或创建 Patient/Provider，创建 Order 和 CarePlan，放入队列
+     * Creates an order by finding or creating the patient and provider, creating the
+     * Order and CarePlan, then enqueueing the CarePlan for processing.
      *
-     * 原来在 OrderController 第 28-72 行的 createOrder() 方法体
+     * This logic previously lived in OrderController's createOrder() method.
      */
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
         List<String> warnings = new ArrayList<>();
 
-        // 1) Provider 重复检测
+        // 1) Detect duplicate providers.
         Provider provider = providerRepository.findByNpi(request.getProviderNpi())
                 .map(existingProvider -> {
                     if (!sameText(existingProvider.getName(), request.getProviderName())) {
@@ -87,7 +88,7 @@ public class OrderService {
                     return providerRepository.save(newProvider);
                 });
 
-        // 2) Patient 重复检测
+        // 2) Detect duplicate patients.
         Patient patient;
         Optional<Patient> existingByMrn = patientRepository.findByMrn(request.getPatientMrn());
 
@@ -122,7 +123,7 @@ public class OrderService {
             patient = patientRepository.save(newPatient);
         }
 
-        // 3) Order 重复检测
+        // 3) Detect duplicate orders.
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime nextDayStart = today.plusDays(1).atStartOfDay();
@@ -161,7 +162,7 @@ public class OrderService {
             }
         }
 
-        // 4) 创建 Order
+        // 4) Create the order.
         Order order = new Order();
         order.setPatient(patient);
         order.setProvider(provider);
@@ -172,13 +173,13 @@ public class OrderService {
         order.setPatientRecords(request.getPatientRecords());
         order = orderRepository.save(order);
 
-        // 5) 创建 CarePlan，状态为 PENDING
+        // 5) Create a CarePlan in the PENDING state.
         CarePlan carePlan = new CarePlan();
         carePlan.setOrder(order);
         carePlan.setStatus(CarePlan.Status.PENDING);
         carePlan = carePlanRepository.save(carePlan);
 
-        // 6) 把任务放进队列。本地是 Redis，AWS Lambda profile 下是 SQS。
+        // 6) Enqueue the task. Redis is used locally; the AWS Lambda profile uses SQS.
         carePlanQueue.enqueue(carePlan.getId());
 
         OrderResponse response = orderMapper.toResponse(order, carePlan);
@@ -197,10 +198,10 @@ public class OrderService {
     }
 
     /**
-     * 根据订单 ID 查询订单状态和 CarePlan 内容
+     * Retrieves an order's status and CarePlan content by order ID.
      *
-     * 原来在 OrderController 第 77-86 行（getCarePlanStatus）
-     * 和第 88-97 行（getOrder）——两个方法逻辑完全一样，合并成一个
+     * This consolidates the former getCarePlanStatus() and getOrder() methods in
+     * OrderController, which had identical logic.
      */
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id)
@@ -249,15 +250,15 @@ public class OrderService {
     }
 
     /**
-     * 根据患者名字或 MRN 搜索订单
+     * Searches orders by patient name or MRN.
      *
-     * 原来在 OrderController 第 112-145 行的 searchOrders() 方法体
+     * This logic previously lived in OrderController's searchOrders() method.
      */
     public List<OrderResponse> searchOrders(String patientName, String mrn) {
         List<Order> orders;
 
         if (mrn != null && !mrn.isEmpty()) {
-            // 根据 MRN 搜索
+            // Search by MRN.
             Patient patient = patientRepository.findByMrn(mrn).orElse(null);
             if (patient != null) {
                 orders = orderRepository.findByPatient(patient);
@@ -265,7 +266,7 @@ public class OrderService {
                 orders = List.of();
             }
         } else if (patientName != null && !patientName.isEmpty()) {
-            // 根据患者名字搜索（支持模糊搜索）
+            // Search by patient name with partial matching.
             List<Patient> patients = patientRepository
                     .findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
                             patientName, patientName);
@@ -273,7 +274,7 @@ public class OrderService {
                     .flatMap(patient -> orderRepository.findByPatient(patient).stream())
                     .collect(Collectors.toList());
         } else {
-            // 没有搜索条件，返回所有订单
+            // Return all orders when no search criteria are supplied.
             orders = orderRepository.findAll();
         }
 
@@ -361,12 +362,12 @@ public class OrderService {
     }
 
     /**
-     * 获取下载内容：验证状态 + 拼装文件文字
+     * Prepares downloadable content by validating the CarePlan status and building the file body.
      *
-     * 原来在 OrderController 第 148-176 行（downloadCarePlan 方法体）
-     * 和第 226-277 行（buildDownloadContent 私有方法）
+     * This combines the former downloadCarePlan() and buildDownloadContent()
+     * methods from OrderController.
      *
-     * 返回 byte[]，Controller 只负责设置 HTTP 响应头
+     * Returns byte[]; the controller only sets the HTTP response headers.
      */
     public CarePlanDownload downloadCarePlan(Long id) {
         Order order = orderRepository.findById(id)

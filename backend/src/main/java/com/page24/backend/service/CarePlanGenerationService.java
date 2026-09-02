@@ -11,21 +11,21 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 /**
- * Care Plan 生成服务 - 负责调 LLM，并支持失败重试
+ * Generates Care Plans through an LLM and retries transient failures.
  *
- * 这里是 Celery 对应的 Java 实现方式：
+ * Java equivalent of the Celery implementation:
  *
- * Python Celery 写法：
+ * Python Celery version:
  *   @app.task(autoretry_for=(Exception,), max_retries=3, retry_backoff=True)
  *   def generate_care_plan(careplan_id):
  *       ...
  *
- * Java Spring Retry 写法：
+ * Java Spring Retry version:
  *   @Retryable(retryFor = Exception.class, maxAttempts = 3,
  *              backoff = @Backoff(delay = 2000, multiplier = 2))
  *   public void generateCarePlan(Long carePlanId) { ... }
  *
- * 效果完全一样：失败了自动重试，每次等待时间翻倍（指数退避）
+ * Both approaches retry automatically after failures, doubling the wait time between attempts through exponential backoff.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,20 +34,20 @@ public class CarePlanGenerationService {
 
     private static final String GENERATION_FAILURE_MESSAGE = "LLM service unavailable";
 
-    // 业务层不直接依赖 OpenAI/Claude：通过 factory 选出当前 provider。
+    // Business code selects the active provider through the factory instead of depending directly on OpenAI or Claude.
     private final LLMAdapterFactory llmAdapterFactory;
     private final CarePlanRepository carePlanRepository;
 
     /**
-     * 调用 LLM 生成 Care Plan，失败时自动重试
+     * Generates a Care Plan with the LLM and automatically retries failures.
      *
-     * @Retryable 参数说明：
-     * - retryFor: 遇到什么异常才重试（这里是所有 Exception）
-     * - maxAttempts: 最多尝试几次（包括第一次，所以是"1次正常 + 2次重试"）
-     * - backoff.delay: 第一次重试前等待多少毫秒（2秒）
-     * - backoff.multiplier: 每次重试等待时间乘以多少（指数退避：2秒→4秒→8秒）
+     * @Retryable configuration:
+     * - retryFor: Exception types that trigger a retry, here every Exception.
+     * - maxAttempts: Total number of attempts, including the initial call, so this permits one initial attempt and two retries.
+     * - backoff.delay: Milliseconds to wait before the first retry (2 seconds).
+     * - backoff.multiplier: Factor applied to the wait time after each retry, producing exponential backoff (2 seconds, then 4, then 8).
      *
-     * 对应 Celery 的：
+     * Equivalent Celery settings:
      *   retry_backoff=True, retry_backoff_max=10, max_retries=3
      */
     @Retryable(
@@ -56,20 +56,20 @@ public class CarePlanGenerationService {
             backoff = @Backoff(delay = 2000, multiplier = 2)
     )
     public void generateWithRetry(Long carePlanId) {
-        // 找到 CarePlan
+        // Load the CarePlan being generated.
         CarePlan carePlan = carePlanRepository.findById(carePlanId)
                 .orElseThrow(() -> new RuntimeException("CarePlan not found: " + carePlanId));
 
         Order order = carePlan.getOrder();
 
-        // 拼病人信息
+        // Build the patient context supplied to the LLM.
         String patientInfo = buildPatientInfo(order);
 
-        // 调用 LLM（这里可能失败，失败了 @Retryable 会自动重试）
+        // Invoke the LLM. Failures here are retried by @Retryable.
         log.info("🤖 调用 LLM 生成 Care Plan... (carePlanId={})", carePlanId);
         String content = llmAdapterFactory.getService().generateCarePlan(patientInfo);
 
-        // 成功：更新数据库
+        // Persist the successfully generated plan.
         carePlan.setContent(content);
         carePlan.setStatus(CarePlan.Status.COMPLETED);
         carePlan.setErrorMessage(null);
@@ -79,11 +79,11 @@ public class CarePlanGenerationService {
     }
 
     /**
-     * @Recover：当重试全部用完还是失败时，会调用这个方法
+     * @Recover handles the request after all retry attempts have failed.
      *
-     * 注意：方法签名第一个参数必须是异常类型，后面参数和 @Retryable 方法一致
+     * The first method parameter must be the exception type; remaining parameters must match the @Retryable method.
      *
-     * 对应 Celery 的：
+     * Equivalent Celery hook:
      *   @app.task(on_failure=handle_failure)
      */
     @Recover
@@ -91,7 +91,7 @@ public class CarePlanGenerationService {
         log.error("❌ 重试 3 次全部失败，标记为 FAILED (carePlanId={})", carePlanId);
         log.error("   失败原因: {}", e.getMessage());
 
-        // 把状态改成 FAILED，用户可以后续手动重新提交
+        // Mark the plan as failed so the user can resubmit it later.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.FAILED);
             // Store a stable, user-safe message. The original exception can include

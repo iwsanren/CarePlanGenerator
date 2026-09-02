@@ -8,9 +8,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
- * Redis 配置类
+ * Redis configuration.
  *
- * Day 4: 配置 RedisTemplate，用于操作 Redis 队列
+ * Day 4: Configures RedisTemplate for queue operations.
  */
 @Configuration
 @Profile("!lambda")
@@ -21,7 +21,7 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // 使用 String 序列化器（简单易懂）
+        // Store keys and values as strings to keep queue entries straightforward.
         StringRedisSerializer stringSerializer = new StringRedisSerializer();
         template.setKeySerializer(stringSerializer);
         template.setValueSerializer(stringSerializer);

@@ -18,14 +18,14 @@ import java.util.List;
 import java.nio.charset.StandardCharsets;
 
 /**
- * OrderController - HTTP 请求/响应层
+ * OrderController - HTTP request and response layer.
  *
- * 职责：只管"收"和"发"
- *   - 读取请求参数
- *   - 调用 OrderService 拿结果
- *   - 设置 HTTP 状态码和响应头，返回给前端
+ * Responsibilities are limited to HTTP coordination:
+ *   - Read request parameters.
+ *   - Delegate work to OrderService.
+ *   - Set HTTP status codes and headers before returning the response.
  *
- * 不做任何业务判断，不直接操作数据库，不知道 Redis 是什么。
+ * It contains no business rules, does not access the database directly, and is unaware of Redis.
  */
 @RestController
 @RequestMapping("/api/v1/orders")

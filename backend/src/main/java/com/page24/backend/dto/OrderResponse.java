@@ -5,7 +5,8 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 后端传给前端，后端处理完毕后返回给前端的数据。比如查询结果或操作结果。
+ * The API response returned to the frontend after an order request is processed,
+ * such as the result of a query or submission.
  */
 @Data
 public class OrderResponse {
@@ -16,7 +17,7 @@ public class OrderResponse {
     private String status;
     private String carePlanContent;
 
-    // Day 8: 简单返回类型（SUCCESS / WARNING）
+    // Day 8: High-level outcome classification for the request (SUCCESS or WARNING).
     private String resultType;
     private String message;
     private List<String> warnings;

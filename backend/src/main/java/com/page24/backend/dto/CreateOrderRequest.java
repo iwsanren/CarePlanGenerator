@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDate;
 
 /**
- * 前端发请求时带的数据：用户提交的表单
+ * The form data submitted by the user when the frontend creates an order.
  */
 @Data
 public class CreateOrderRequest {
@@ -51,6 +51,6 @@ public class CreateOrderRequest {
     private String medicationHistory;
     private String patientRecords;
 
-    // Day 8: 用户确认 warning 后可继续提交（如不同天同药续方）
+    // Day 8: Allows submission after the user acknowledges a warning, such as a same-medication refill on a different day.
     private Boolean confirm;
 }

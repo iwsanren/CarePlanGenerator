@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Local/mock provider：开发和测试时使用，不调用外部 API。
+ * Local mock provider for development and testing; it never calls an external API.
  */
 @Service("local")
 @Slf4j

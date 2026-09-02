@@ -79,7 +79,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
-        <!-- Spring Retry: 失败自动重试（对应 Celery 的 autoretry_for + retry_backoff） -->
+        <!-- Spring Retry: automatic retries on failure, analogous to Celery's autoretry_for and retry_backoff -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>

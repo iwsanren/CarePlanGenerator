@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * OpenAI provider 实现：负责和 OpenAI API 通信。
+ * OpenAI provider implementation responsible for communicating with the OpenAI API.
  */
 @Service("openai")
 @Slf4j

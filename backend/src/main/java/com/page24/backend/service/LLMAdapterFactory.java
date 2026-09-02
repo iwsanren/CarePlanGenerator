@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Day10 路由层：集中处理 provider 选择，避免业务层出现 vendor if/else。
+ * Day 10 routing layer: centralizes provider selection so business code avoids vendor-specific conditionals.
  */
 @Component
 @Slf4j
@@ -26,7 +26,7 @@ public class LLMAdapterFactory {
 	}
 
 	public BaseLLMService getService() {
-		// 兼容历史语义：mockEnabled=true 时，优先走本地 mock。
+		// Preserve legacy behavior: when mockEnabled is true, prefer the local mock provider.
 		if (mockEnabled) {
 			return getRequired("local");
 		}

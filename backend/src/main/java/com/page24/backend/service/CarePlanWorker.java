@@ -9,16 +9,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Care Plan Worker - 从 Redis 队列拉任务
+ * Care Plan worker that pulls tasks from the Redis queue.
  *
- * 职责划分（对应 Celery 的结构）：
+ * Responsibilities, analogous to a Celery setup:
  *
- *   CarePlanWorker          ← 相当于 Celery Worker 进程（负责"拉任务"）
- *   CarePlanGenerationService ← 相当于 Celery Task 函数（负责"处理任务 + 重试"）
+ *   CarePlanWorker            - equivalent to a Celery worker process that pulls tasks.
+ *   CarePlanGenerationService - equivalent to a Celery task function that processes and retries tasks.
  *
- * Worker 只做两件事：
- * 1. 每 5 秒从 Redis 拉一个任务
- * 2. 把任务交给 CarePlanGenerationService 处理（它负责 LLM 调用和重试）
+ * The worker has two responsibilities:
+ * 1. Pull one task from Redis every five seconds.
+ * 2. Delegate it to CarePlanGenerationService, which handles the LLM call and retries.
  */
 @Service
 @Profile("!lambda")
@@ -31,16 +31,15 @@ public class CarePlanWorker {
     private final CarePlanGenerationService carePlanGenerationService;
 
     /**
-     * 每 5 秒执行一次，从队列里拉一个任务来处理
+     * Runs every five seconds and processes one task from the queue.
      *
-     * fixedDelay = 5000：
-     *   上一次处理完毕后等 5 秒，再执行下一次
-     *   （不是每 5 秒固定触发，是处理完再等）
+     * With fixedDelay = 5000, the next invocation begins five seconds after the
+     * previous one finishes, rather than on a fixed five-second schedule.
      */
     @Scheduled(fixedDelay = 5000)
     public void processNextTask() {
 
-        // 步骤 1：从 Redis 拉任务，空队列就退出
+        // Step 1: Pull a task from Redis and return when the queue is empty.
         Long carePlanId = queueService.dequeue();
         if (carePlanId == null) {
             return;
@@ -48,19 +47,19 @@ public class CarePlanWorker {
 
         log.info("🔄 Worker 拿到任务: carePlanId={}", carePlanId);
 
-        // 步骤 2：状态改成 PROCESSING（告诉数据库"正在处理了"）
+        // Step 2: Mark the CarePlan as PROCESSING before generation begins.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.PROCESSING);
             carePlanRepository.save(carePlan);
         });
         log.info("⚙️  状态改为 PROCESSING: carePlanId={}", carePlanId);
 
-        // 步骤 3：交给 GenerationService 处理
-        // 它内部有 @Retryable，失败会自动重试，不用我们管
+        // Step 3: Delegate processing to GenerationService.
+        // Its @Retryable annotation handles retries for failures.
         carePlanGenerationService.generateWithRetry(carePlanId);
 
-        // ⚠️ 处理完了，前端依然不知道！
-        // 用户必须手动刷新才能看到 COMPLETED 状态。
-        // 这就是今天故意留下的"痛点"——明天用 Polling 解决。
+        // The frontend is not notified when processing finishes.
+        // The user must refresh manually to see the COMPLETED status.
+        // This intentional limitation is addressed with polling on the next day.
     }
 }

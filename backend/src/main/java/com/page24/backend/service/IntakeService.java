@@ -45,7 +45,7 @@ public class IntakeService {
     }
 
     //TODO:
-    // 处理csv格式的数据，并将结果return给controller。
+    // Parse Hospital D CSV input and return the resulting order response to the controller.
     public OrderResponse createFromHospitalDCsv(String rawCsv, boolean confirm){
         HospitalDAdapter hospitalDAdapter = intakeAdapterFactory.getAdapter("hospital-d", HospitalDAdapter.class);
         HospitalDAdapter.HospitalDPayload payload = hospitalDAdapter.parse(rawCsv);

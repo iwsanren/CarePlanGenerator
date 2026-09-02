@@ -100,11 +100,11 @@ class OrderControllerGetIntegrationTest {
     @Test
     @DisplayName("GET /api/v1/orders - patient_name supports fuzzy search")
     void shouldSearchByPatientName() throws Exception {
-        createOrder("张", "三", "100001", CarePlan.Status.COMPLETED);
+        createOrder("John", "Smith", "100001", CarePlan.Status.COMPLETED);
         createOrder("Alice", "Wong", "100002", CarePlan.Status.PENDING);
 
         mockMvc.perform(get("/api/v1/orders")
-                        .param("patient_name", "张"))
+                        .param("patient_name", "John"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.results[0].status").value("completed"));
@@ -113,13 +113,13 @@ class OrderControllerGetIntegrationTest {
     @Test
     @DisplayName("GET /api/v1/orders - supports status and patient_name together")
     void shouldFilterByStatusAndPatientName() throws Exception {
-        createOrder("张", "三", "100001", CarePlan.Status.COMPLETED);
-        createOrder("张", "四", "100002", CarePlan.Status.PENDING);
+        createOrder("John", "Smith", "100001", CarePlan.Status.COMPLETED);
+        createOrder("John", "Doe", "100002", CarePlan.Status.PENDING);
         createOrder("Alice", "Wong", "100003", CarePlan.Status.COMPLETED);
 
         mockMvc.perform(get("/api/v1/orders")
                         .param("status", "completed")
-                        .param("patient_name", "张"))
+                        .param("patient_name", "John"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.results[0].status").value("completed"));

@@ -7,12 +7,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Redis 队列服务
+ * Redis-backed queue service.
  *
- * Day 4 学习要点：
- * 1. Redis 只是一个"存储空间"，用来存放待处理的任务
- * 2. 这个服务只负责"放进去"，不负责处理
- * 3. 处理任务的部分（Worker）是 Day 5 的内容
+ * Day 4 learning objectives:
+ * 1. Redis is a storage layer for tasks awaiting processing.
+ * 2. This service only enqueues tasks; it does not process them.
+ * 3. Task processing is introduced with the worker on Day 5.
  */
 @Service
 @Profile("!lambda")
@@ -22,29 +22,29 @@ public class QueueService implements CarePlanQueue {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    // 队列的名字
+    // Redis list key used for queued CarePlan IDs.
     private static final String QUEUE_NAME = "careplan:queue";
 
     /**
-     * 把 CarePlan ID 放进队列
+     * Adds a CarePlan ID to the queue.
      *
-     * @param carePlanId CarePlan的ID
+     * @param carePlanId the CarePlan ID to enqueue
      */
     public void enqueue(Long carePlanId) {
         log.info("📥 放入队列: carePlanId={}", carePlanId);
 
-        // 把 ID 放到 Redis 队列的右边（尾部）
+        // Append the ID to the tail of the Redis list.
         redisTemplate.opsForList().rightPush(QUEUE_NAME, carePlanId.toString());
 
         log.info("✅ 已放入队列，当前队列长度: {}", getQueueSize());
     }
 
     /**
-     * 从队列取出一个任务（左边/头部）
+     * Removes one task from the head of the queue.
      *
-     * 注意：这个方法 Day 4 不会用，是 Day 5 Worker 才会用的
+     * This method is introduced for the Day 5 worker and is not used on Day 4.
      *
-     * @return CarePlan ID，如果队列为空则返回 null
+     * @return the CarePlan ID, or null when the queue is empty
      */
     public Long dequeue() {
         String carePlanId = (String) redisTemplate.opsForList().leftPop(QUEUE_NAME);
@@ -56,7 +56,7 @@ public class QueueService implements CarePlanQueue {
     }
 
     /**
-     * 查看队列长度
+     * Returns the current queue length.
      */
     public Long getQueueSize() {
         Long size = redisTemplate.opsForList().size(QUEUE_NAME);
@@ -64,7 +64,7 @@ public class QueueService implements CarePlanQueue {
     }
 
     /**
-     * 查看队列里所有的任务（不删除）
+     * Returns all queued tasks without removing them.
      */
     public java.util.List<Object> viewQueue() {
         Long size = getQueueSize();

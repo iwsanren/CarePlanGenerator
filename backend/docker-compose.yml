@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL 数据库
+  # PostgreSQL database
   postgres:
     image: postgres:15-alpine
     container_name: careplan-postgres
@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis 消息队列
+  # Redis message queue
   redis:
     image: redis:7-alpine
     container_name: careplan-redis
@@ -31,7 +31,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Spring Boot 应用
+  # Spring Boot application
   backend:
     build:
       context: .
@@ -43,24 +43,24 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # 数据库连接配置（固定值，和上面的 postgres 配置一致）
+      # Database connection settings, matching the postgres service above
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/careplan
       SPRING_DATASOURCE_USERNAME: careplan_user
       SPRING_DATASOURCE_PASSWORD: careplan_password
-      # Redis 配置
+      # Redis settings
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
-      # LLM API 配置（从 .env 读取）
+      # LLM API settings, loaded from .env
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
-      # 调试配置
+      # Remote debugging settings
       JAVA_TOOL_OPTIONS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
     ports:
       - "8080:8080"
-      - "5005:5005"  # 调试端口
+      - "5005:5005"  # Debugging port
     restart: unless-stopped
 
-  # 测试容器：用于在 Docker 中执行 Maven tests
+  # Test container for running Maven tests in Docker
   backend-test:
     image: maven:3.9-eclipse-temurin-17-alpine
     container_name: careplan-backend-test
@@ -73,7 +73,7 @@ services:
       LLM_MOCK_ENABLED: true
     entrypoint: ["sh", "-c", "chmod +x ./mvnw && ./mvnw -Dspring.profiles.active=test test"]
 
-  # Prometheus：抓取 Spring Boot 指标
+  # Prometheus scrapes Spring Boot metrics
   prometheus:
     image: prom/prometheus:latest
     container_name: careplan-prometheus
@@ -84,7 +84,7 @@ services:
     depends_on:
       - backend
 
-  # Grafana：可视化指标
+  # Grafana visualizes metrics
   grafana:
     image: grafana/grafana:latest
     container_name: careplan-grafana

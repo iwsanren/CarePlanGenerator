@@ -8,23 +8,23 @@ import java.time.ZoneOffset;
 import java.util.Locale;
 
 /**
- * OrderMapper - 数据格式转换
+ * OrderMapper - maps persistence entities to API response DTOs.
  *
- * 职责：把数据库实体（Order + CarePlan）转换成前端需要的格式（OrderResponse）
- * 对应苍穹外卖里的 VO 组装逻辑（BeanUtils.copyProperties + 额外字段填充）
+ * Converts the Order and CarePlan entities into the OrderResponse shape expected by the frontend.
+ * This follows the view-object assembly pattern: copy common properties and populate derived fields.
  *
- * 为什么单独放这里？
- * - Controller 不应该知道"怎么拼 Response"
- * - Service 不应该知道"前端要什么格式"
- * - Mapper 是中间人，只做格式转换，不做任何业务判断
+ * Keeping this mapping separate preserves clear boundaries:
+ * - Controllers do not need to know how a response is assembled.
+ * - Services do not need to know the frontend response format.
+ * - Mappers transform data only; they do not apply business rules.
  */
 @Component
 public class OrderMapper {
 
     /**
-     * 把 Order + CarePlan 实体转换成 OrderResponse（返回给前端的格式）
+     * Converts an Order and its CarePlan into the response returned to the frontend.
      *
-     * 原来在 OrderController 第 207-224 行的 toResponse() 方法
+     * This logic previously lived in OrderController's toResponse() method.
      */
     public OrderResponse toResponse(Order order, CarePlan carePlan) {
         OrderResponse response = new OrderResponse();
@@ -37,7 +37,7 @@ public class OrderMapper {
 
         if (carePlan != null) {
             response.setStatus(carePlan.getStatus().name());
-            // 只有在 COMPLETED 状态时才返回内容
+            // Expose the generated plan only after generation has completed.
             if (carePlan.getStatus() == CarePlan.Status.COMPLETED) {
                 response.setCarePlanContent(carePlan.getContent());
             }
