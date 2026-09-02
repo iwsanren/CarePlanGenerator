@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { OrdersPage } from '@/pages/OrdersPage'
 
 interface PlaceholderProps {
   title: string
@@ -18,7 +19,7 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Placeholder title="New Order" />} />
-        <Route path="/orders" element={<Placeholder title="Orders" />} />
+          <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id" element={<Placeholder title="Order Detail" />} />
       </Routes>
     </Layout>
