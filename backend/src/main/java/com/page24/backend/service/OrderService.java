@@ -205,7 +205,7 @@ public class OrderService {
      */
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ValidationError("ORDER_NOT_FOUND", "Order not found"));
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         CarePlan carePlan = carePlanRepository.findByOrderId(id)
                 .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
