@@ -8,6 +8,8 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.page24.backend.validation.Icd10Codes;
+
 /** Partial-update request body for PUT /patients/{id}. */
 @Data
 public class UpdatePatientRequest {
@@ -37,11 +39,11 @@ public class UpdatePatientRequest {
 
     private String allergies;
 
-    @Pattern(regexp = CreatePatientRequest.ICD10_REGEX, message = "primary_diagnosis must be a valid ICD-10 code")
+    @Pattern(regexp = Icd10Codes.REGEX, message = "primary_diagnosis must be a valid ICD-10 code")
     private String primaryDiagnosis;
 
     private List<
-            @Pattern(regexp = CreatePatientRequest.ICD10_REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")
+            @Pattern(regexp = Icd10Codes.REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")
             String
             > additionalDiagnoses;
 }

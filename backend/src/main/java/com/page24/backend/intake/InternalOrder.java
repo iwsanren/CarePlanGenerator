@@ -9,6 +9,8 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.page24.backend.validation.Icd10Codes;
+
 /**
  * Day9 Step1:
  * Internal unified model for all external intake sources.
@@ -17,7 +19,6 @@ import java.util.List;
 @Data
 public class InternalOrder {
     // Reusable patterns (can later move to ValidationPatterns class)
-    public static final String ICD10_REGEX = "^[A-Z][0-9][0-9A-Z](\\.[0-9A-Z]{1,4})?$";
     public static final String NPI_REGEX = "^\\d{10}$";
     public static final String MRN_REGEX = "^\\d{6}$";
 
@@ -72,12 +73,12 @@ public class InternalOrder {
     @Data
     public static class Diagnosis {
         @NotBlank(message = "diagnosis.primaryDiagnosis is required")
-        @Pattern(regexp = ICD10_REGEX, message = "diagnosis.primaryDiagnosis must be a valid ICD-10 code")
+        @Pattern(regexp = Icd10Codes.REGEX, message = "diagnosis.primaryDiagnosis must be a valid ICD-10 code")
         private String primaryDiagnosis;
 
         // Optional list; each item must be valid ICD-10 when present
         private List<@Pattern(
-                regexp = ICD10_REGEX,
+                regexp = Icd10Codes.REGEX,
                 message = "diagnosis.additionalDiagnoses item must be a valid ICD-10 code"
         ) String> additionalDiagnoses;
     }

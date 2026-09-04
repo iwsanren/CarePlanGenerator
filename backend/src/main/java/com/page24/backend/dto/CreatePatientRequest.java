@@ -12,10 +12,10 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.page24.backend.validation.Icd10Codes;
+
 @Data
 public class CreatePatientRequest {
-
-    public static final String ICD10_REGEX = "^[A-Z][0-9][0-9A-Z](\\.[0-9A-Z]{1,4})?$";
 
     @NotBlank(message = "first_name is required")
     private String firstName;
@@ -39,7 +39,7 @@ public class CreatePatientRequest {
     private String allergies;
 
     @NotBlank(message = "primary_diagnosis_code is required")
-    @Pattern(regexp = ICD10_REGEX, message = "primary_diagnosis_code must be a valid ICD-10 code")
+    @Pattern(regexp = Icd10Codes.REGEX, message = "primary_diagnosis_code must be a valid ICD-10 code")
     @JsonAlias("primary_diagnosis")
     private String primaryDiagnosis;
 
@@ -47,7 +47,7 @@ public class CreatePatientRequest {
     private String primaryDiagnosisDescription;
 
     private List<
-            @Pattern(regexp = ICD10_REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")
+            @Pattern(regexp = Icd10Codes.REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")
             String
             > additionalDiagnoses;
 }
