@@ -40,7 +40,11 @@ public class Order {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        // Keep an explicitly supplied timestamp for imports and reports; new
+        // orders created by the application still receive the current time.
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 }
 
