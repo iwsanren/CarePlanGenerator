@@ -25,7 +25,6 @@ public class CreateOrderRequest {
     @Pattern(regexp = "^\\d{6}$", message = "MRN must be exactly 6 digits")
     private String patientMrn;
 
-    @NotNull(message = "patientDateOfBirth is required")
     private LocalDate patientDateOfBirth;
 
     @NotBlank(message = "providerName is required")
@@ -47,6 +46,6 @@ public class CreateOrderRequest {
     private String medicationHistory;
     private String patientRecords;
 
-    // Day 8: Allows submission after the user acknowledges a warning, such as a same-medication refill on a different day.
+    // Allows submission after the user acknowledges a warning, such as a same-medication refill on a different day.
     private Boolean confirm;
 }

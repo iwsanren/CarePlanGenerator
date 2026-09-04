@@ -96,20 +96,22 @@ public class OrderService {
             Patient matched = existingByMrn.get();
             boolean sameName = sameText(matched.getFirstName(), request.getPatientFirstName())
                     && sameText(matched.getLastName(), request.getPatientLastName());
-            boolean sameDob = matched.getDateOfBirth() != null
-                    && matched.getDateOfBirth().equals(request.getPatientDateOfBirth());
+            boolean sameDob = request.getPatientDateOfBirth() == null
+                    || (matched.getDateOfBirth() != null
+                    && matched.getDateOfBirth().equals(request.getPatientDateOfBirth()));
 
             if (!sameName || !sameDob) {
                 warnings.add("Patient warning: MRN exists but name or DOB is different");
             }
             patient = matched;
         } else {
-            Optional<Patient> existingByNameDob = patientRepository
-                    .findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
-                            request.getPatientFirstName(),
-                            request.getPatientLastName(),
-                            request.getPatientDateOfBirth()
-                    );
+            Optional<Patient> existingByNameDob = request.getPatientDateOfBirth() == null
+                    ? Optional.empty()
+                    : patientRepository.findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
+                    request.getPatientFirstName(),
+                    request.getPatientLastName(),
+                    request.getPatientDateOfBirth()
+            );
 
             existingByNameDob
                     .filter(p -> !sameText(p.getMrn(), request.getPatientMrn()))
