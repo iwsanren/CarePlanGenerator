@@ -93,6 +93,7 @@ public class OrderService {
         Optional<Patient> existingByMrn = patientRepository.findByMrn(request.getPatientMrn());
 
         if (existingByMrn.isPresent()) {
+            // existing patient
             Patient matched = existingByMrn.get();
             boolean sameName = sameText(matched.getFirstName(), request.getPatientFirstName())
                     && sameText(matched.getLastName(), request.getPatientLastName());
@@ -105,6 +106,7 @@ public class OrderService {
             }
             patient = matched;
         } else {
+            // create a new patient
             Optional<Patient> existingByNameDob = request.getPatientDateOfBirth() == null
                     ? Optional.empty()
                     : patientRepository.findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
@@ -122,6 +124,9 @@ public class OrderService {
             newPatient.setLastName(request.getPatientLastName());
             newPatient.setMrn(request.getPatientMrn());
             newPatient.setDateOfBirth(request.getPatientDateOfBirth());
+            newPatient.setSex(request.getPatientSex());
+            newPatient.setWeightKg(request.getPatientWeightKg());
+            newPatient.setAllergies(request.getPatientAllergies());
             patient = patientRepository.save(newPatient);
         }
 

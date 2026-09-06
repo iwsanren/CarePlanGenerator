@@ -3,6 +3,8 @@ package com.page24.backend.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -14,6 +16,7 @@ import com.page24.backend.validation.Icd10Codes;
  */
 @Data
 public class CreateOrderRequest {
+    private String patientSex;
 
     @NotBlank(message = "patientFirstName is required")
     private String patientFirstName;
@@ -48,4 +51,10 @@ public class CreateOrderRequest {
 
     // Allows submission after the user acknowledges a warning, such as a same-medication refill on a different day.
     private Boolean confirm;
+
+    @Positive(message = "patientWeightKg must be greater than 0")
+    @DecimalMax(value = "500", message = "patientWeightKg must be less than or equal to 500")
+    private Double patientWeightKg;
+
+    private String patientAllergies;
 }
