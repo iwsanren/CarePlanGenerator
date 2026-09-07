@@ -12,7 +12,7 @@ public class LocalLLM implements BaseLLMService {
 
     @Override
     public String generateCarePlan(String patientInfo) {
-        log.info("[LOCAL LLM] 使用 mock 内容生成 care plan, patientInfoLength={}", patientInfo.length());
+        log.info("[LOCAL LLM] Generate a care plan using mock content, patientInfoLength={}", patientInfo.length());
         return """
                 [LOCAL MOCK CARE PLAN]
 

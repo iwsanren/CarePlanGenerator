@@ -3,6 +3,10 @@ package com.page24.backend.service;
 import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.entity.Patient;
+import com.page24.backend.entity.Provider;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.annotation.Backoff;
@@ -66,7 +70,7 @@ public class CarePlanGenerationService {
         String patientInfo = buildPatientInfo(order);
 
         // Invoke the LLM. Failures here are retried by @Retryable.
-        log.info("🤖 调用 LLM 生成 Care Plan... (carePlanId={})", carePlanId);
+        log.info("🤖 Calling the LLM to generate a Care Plan... (carePlanId={})", carePlanId);
         String content = llmAdapterFactory.getService().generateCarePlan(patientInfo);
 
         // Persist the successfully generated plan.
@@ -75,7 +79,7 @@ public class CarePlanGenerationService {
         carePlan.setErrorMessage(null);
         carePlanRepository.save(carePlan);
 
-        log.info("✅ Care Plan 生成完成 (carePlanId={})", carePlanId);
+        log.info("✅ Care Plan generation completed (carePlanId={})", carePlanId);
     }
 
     /**
@@ -88,8 +92,8 @@ public class CarePlanGenerationService {
      */
     @Recover
     public void handleAllRetriesExhausted(Exception e, Long carePlanId) {
-        log.error("❌ 重试 3 次全部失败，标记为 FAILED (carePlanId={})", carePlanId);
-        log.error("   失败原因: {}", e.getMessage());
+        log.error("❌ All 3 retry attempts failed; marking the Care Plan as FAILED (carePlanId={})", carePlanId);
+        log.error("   Failure reason: {}", e.getMessage());
 
         // Mark the plan as failed so the user can resubmit it later.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
@@ -101,32 +105,63 @@ public class CarePlanGenerationService {
         });
     }
 
-    private String buildPatientInfo(Order order) {
-        return String.format("""
-                Name: %s %s
-                MRN: %s
-                DOB: %s
-                Provider: %s (NPI: %s)
-                Medication: %s
-                Primary Diagnosis: %s
-                Additional Diagnoses: %s
-                Medication History: %s
-                Patient Records: %s
-                """,
-                order.getPatient().getFirstName(),
-                order.getPatient().getLastName(),
-                order.getPatient().getMrn(),
-                order.getPatient().getDateOfBirth(),
-                order.getProvider().getName(),
-                order.getProvider().getNpi(),
-                order.getMedicationName(),
-                order.getPrimaryDiagnosis() != null ? order.getPrimaryDiagnosis() : "N/A",
-                (order.getAdditionalDiagnoses() == null || order.getAdditionalDiagnoses().isEmpty())
-                        ? "N/A" : String.join(", ", order.getAdditionalDiagnoses()),
-                (order.getMedicationHistory() == null || order.getMedicationHistory().isEmpty())
-                        ? "N/A" : String.join(", ", order.getMedicationHistory()),
-                order.getPatientRecords() != null ? order.getPatientRecords() : "N/A"
+    // package-private so the unit test can call it directly
+    String buildPatientInfo(Order order) {
+        Patient patient = order.getPatient();
+        Provider provider = order.getProvider();
+
+        return String.join("\n",
+                "## PATIENT DEMOGRAPHICS",
+                "Name: " + patient.getFirstName() + " " + patient.getLastName(),
+                "MRN: " + patient.getMrn(),
+                "Date of Birth: " + orNotProvided(patient.getDateOfBirth()),
+                "Sex: " + orNotProvided(patient.getSex()),
+                "Weight: " + (patient.getWeightKg() != null ? patient.getWeightKg() + " kg" : "Not provided"),
+                "Allergies: " + orNotDocumented(patient.getAllergies()),
+                "",
+                "## REFERRING PROVIDER",
+                "Name: " + provider.getName(),
+                "NPI: " + provider.getNpi(),
+                "",
+                "## MEDICATION ORDER",
+                "Medication: " + order.getMedicationName(),
+                "",
+                "## DIAGNOSES",
+                "Primary: " + orNotProvided(order.getPrimaryDiagnosis()),
+                "Secondary:",
+                formatList(order.getAdditionalDiagnoses(), "None"),
+                "",
+                "## MEDICATION HISTORY",
+                formatList(order.getMedicationHistory(), "None reported"),
+                "",
+                "## CLINICAL NOTES",
+                orNotDocumented(order.getPatientRecords())
         );
+    }
+
+    // null becomes "Not provided"; otherwise, preserve the value's string representation.
+    // Used for fields where missing information is acceptable.
+    private static String orNotProvided(Object value) {
+        return value != null ? value.toString() : "Not provided";
+    }
+
+    /**
+     * null or blank values become "Not documented".
+     * Used for fields such as allergies and clinical notes, where missing information is
+     * clinically meaningful and must never be interpreted by the LLM as "confirmed normal."
+     */
+    private static String orNotDocumented(String value) {
+        return (value != null && !value.isBlank()) ? value : "Not documented";
+    }
+
+    /** Renders a List as a Markdown unordered list; returns the fallback for null or empty lists. */
+    private static String formatList(List<String> items, String emptyFallback) {
+        if (items == null || items.isEmpty()) {
+            return emptyFallback;
+        }
+        return items.stream()
+                .map(item -> "- " + item)
+                .collect(Collectors.joining("\n"));
     }
 }
 
