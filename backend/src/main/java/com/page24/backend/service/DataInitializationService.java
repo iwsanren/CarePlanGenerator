@@ -38,11 +38,11 @@ public class DataInitializationService implements CommandLineRunner {
     public void run(String... args) {
         // Avoid inserting the sample data more than once.
         if (patientRepository.count() > 0) {
-            log.info("数据库已有数据，跳过初始化");
+            log.info("Database already contains data; skipping initialization");
             return;
         }
 
-        log.info("开始初始化 Mock Data...");
+        log.info("Starting mock data initialization...");
 
         // 1. Create providers.
         Provider provider1 = createProvider("Dr. Williams", "1234567890");
@@ -141,11 +141,11 @@ public class DataInitializationService implements CommandLineRunner {
         );
         createCarePlan(order7, CarePlan.Status.COMPLETED, generateSampleCarePlan("Prednisone"));
 
-        log.info("Mock Data 初始化完成！");
-        log.info("创建了 {} 个 Providers", providerRepository.count());
-        log.info("创建了 {} 个 Patients", patientRepository.count());
-        log.info("创建了 {} 个 Orders", orderRepository.count());
-        log.info("创建了 {} 个 Care Plans", carePlanRepository.count());
+        log.info("Mock data initialization completed");
+        log.info("Created {} providers", providerRepository.count());
+        log.info("Created {} patients", patientRepository.count());
+        log.info("Created {} orders", orderRepository.count());
+        log.info("Created {} Care Plans", carePlanRepository.count());
     }
 
     private Provider createProvider(String name, String npi) {

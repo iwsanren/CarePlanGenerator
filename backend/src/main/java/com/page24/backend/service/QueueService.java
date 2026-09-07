@@ -31,12 +31,12 @@ public class QueueService implements CarePlanQueue {
      * @param carePlanId the CarePlan ID to enqueue
      */
     public void enqueue(Long carePlanId) {
-        log.info("📥 放入队列: carePlanId={}", carePlanId);
+        log.info("📥 Enqueuing Care Plan: carePlanId={}", carePlanId);
 
         // Append the ID to the tail of the Redis list.
         redisTemplate.opsForList().rightPush(QUEUE_NAME, carePlanId.toString());
 
-        log.info("✅ 已放入队列，当前队列长度: {}", getQueueSize());
+        log.info("✅ Care Plan enqueued; current queue size: {}", getQueueSize());
     }
 
     /**
@@ -49,7 +49,7 @@ public class QueueService implements CarePlanQueue {
     public Long dequeue() {
         String carePlanId = (String) redisTemplate.opsForList().leftPop(QUEUE_NAME);
         if (carePlanId != null) {
-            log.info("📤 从队列取出: carePlanId={}", carePlanId);
+            log.info("📤 Dequeued Care Plan: carePlanId={}", carePlanId);
             return Long.parseLong(carePlanId);
         }
         return null;

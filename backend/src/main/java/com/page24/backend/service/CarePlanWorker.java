@@ -45,14 +45,14 @@ public class CarePlanWorker {
             return;
         }
 
-        log.info("🔄 Worker 拿到任务: carePlanId={}", carePlanId);
+        log.info("🔄 Worker picked up task: carePlanId={}", carePlanId);
 
         // Step 2: Mark the CarePlan as PROCESSING before generation begins.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.PROCESSING);
             carePlanRepository.save(carePlan);
         });
-        log.info("⚙️  状态改为 PROCESSING: carePlanId={}", carePlanId);
+        log.info("⚙️  Status updated to PROCESSING: carePlanId={}", carePlanId);
 
         // Step 3: Delegate processing to GenerationService.
         // Its @Retryable annotation handles retries for failures.
