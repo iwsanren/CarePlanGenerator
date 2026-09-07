@@ -32,8 +32,8 @@ public class ClinicB {
 
         request.setMedicationName(payload.getRx().getMedName());
         request.setPrimaryDiagnosis(payload.getDx().getPrimary());
-        request.setAdditionalDiagnosis(Common.joinByComma(payload.getDx().getSecondary()));
-        request.setMedicationHistory(Common.joinByNewLine(payload.getMedHx()));
+        request.setAdditionalDiagnoses(payload.getDx().getSecondary());
+        request.setMedicationHistory(payload.getMedHx());
         request.setPatientRecords(payload.getClinicalNotes());
         request.setConfirm(Boolean.TRUE.equals(confirm));
 

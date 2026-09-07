@@ -170,8 +170,8 @@ class OrderServicePatientDuplicateUnitTest {
         request.setProviderNpi("1111111111");
         request.setMedicationName("IVIG");
         request.setPrimaryDiagnosis("G70.00");
-        request.setAdditionalDiagnosis("I10");
-        request.setMedicationHistory("Prednisone");
+        request.setAdditionalDiagnoses(List.of("I10"));
+        request.setMedicationHistory(List.of("Prednisone"));
         request.setPatientRecords("Unit test patient records");
         request.setConfirm(false);
         return request;

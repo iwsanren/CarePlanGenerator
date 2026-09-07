@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Initializes the database with mock data.
@@ -62,8 +63,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider1,
             "IVIG (Immune Globulin Intravenous)",
             "G70.00 - Generalized myasthenia gravis",
-            "I10 - Hypertension, K21.9 - GERD",
-            "Pyridostigmine 60mg q6h PRN, Prednisone 10mg daily, Lisinopril 10mg daily",
+            List.of("I10 - Hypertension", "K21.9 - GERD"),
+            List.of("Pyridostigmine 60mg q6h PRN", "Prednisone 10mg daily", "Lisinopril 10mg daily"),
             "Progressive proximal muscle weakness and ptosis over 2 weeks. Neurology recommends IVIG."
         );
         createCarePlan(order1, CarePlan.Status.COMPLETED, generateSampleCarePlan("IVIG"));
@@ -74,8 +75,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider1,
             "Methotrexate",
             "G70.00 - Generalized myasthenia gravis",
-            "I10 - Hypertension",
-            "Pyridostigmine 60mg q6h PRN, Prednisone 10mg daily",
+            List.of("I10 - Hypertension"),
+            List.of("Pyridostigmine 60mg q6h PRN", "Prednisone 10mg daily"),
             "Follow-up therapy for myasthenia gravis management."
         );
         createCarePlan(order2, CarePlan.Status.PROCESSING, null);
@@ -86,8 +87,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider2,
             "Humira (Adalimumab)",
             "M05.79 - Rheumatoid arthritis",
-            "E11.9 - Type 2 diabetes mellitus",
-            "Methotrexate 15mg weekly, Folic acid 1mg daily",
+            List.of("E11.9 - Type 2 diabetes mellitus"),
+            List.of("Methotrexate 15mg weekly", "Folic acid 1mg daily"),
             "Patient has active RA despite methotrexate. Starting biologic therapy."
         );
         createCarePlan(order3, CarePlan.Status.PENDING, null);
@@ -98,8 +99,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider2,
             "Enbrel (Etanercept)",
             "L40.54 - Psoriatic arthritis",
-            "None",
-            "NSAIDs as needed",
+            List.of(),
+            List.of("NSAIDs as needed"),
             "New diagnosis of psoriatic arthritis. Starting biologic."
         );
         createCarePlan(order4, CarePlan.Status.COMPLETED, generateSampleCarePlan("Enbrel"));
@@ -110,8 +111,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider3,
             "Remicade (Infliximab)",
             "K50.90 - Crohn's disease",
-            "None",
-            "Mesalamine 800mg TID",
+            List.of(),
+            List.of("Mesalamine 800mg TID"),
             "Moderate to severe Crohn's disease, inadequate response to 5-ASA."
         );
         createCarePlan(order5, CarePlan.Status.FAILED, null);
@@ -122,8 +123,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider3,
             "Ocrevus (Ocrelizumab)",
             "G35 - Multiple sclerosis",
-            "None",
-            "None",
+            List.of(),
+            List.of(),
             "Newly diagnosed relapsing-remitting MS. Starting DMT."
         );
         createCarePlan(order6, CarePlan.Status.PENDING, null);
@@ -134,8 +135,8 @@ public class DataInitializationService implements CommandLineRunner {
             provider1,
             "Prednisone",
             "G70.00 - Generalized myasthenia gravis",
-            "I10 - Hypertension, K21.9 - GERD",
-            "Pyridostigmine 60mg q6h PRN",
+            List.of("I10 - Hypertension", "K21.9 - GERD"),
+            List.of("Pyridostigmine 60mg q6h PRN"),
             "Maintenance therapy for myasthenia gravis."
         );
         createCarePlan(order7, CarePlan.Status.COMPLETED, generateSampleCarePlan("Prednisone"));
@@ -164,14 +165,14 @@ public class DataInitializationService implements CommandLineRunner {
     }
 
     private Order createOrder(Patient patient, Provider provider, String medication,
-                             String primaryDiagnosis, String additionalDiagnosis,
-                             String medicationHistory, String patientRecords) {
+                             String primaryDiagnosis, List<String> additionalDiagnoses,
+                             List<String> medicationHistory, String patientRecords) {
         Order order = new Order();
         order.setPatient(patient);
         order.setProvider(provider);
         order.setMedicationName(medication);
         order.setPrimaryDiagnosis(primaryDiagnosis);
-        order.setAdditionalDiagnosis(additionalDiagnosis);
+        order.setAdditionalDiagnoses(additionalDiagnoses);
         order.setMedicationHistory(medicationHistory);
         order.setPatientRecords(patientRecords);
         return orderRepository.save(order);

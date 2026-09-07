@@ -17,8 +17,10 @@ import org.springframework.http.HttpStatus;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -113,11 +115,29 @@ public class CreateOrderHandler {
         request.setProviderNpi(text(root, "providerNpi"));
         request.setMedicationName(text(root, "medicationName"));
         request.setPrimaryDiagnosis(text(root, "primaryDiagnosis"));
-        request.setAdditionalDiagnosis(text(root, "additionalDiagnosis"));
-        request.setMedicationHistory(text(root, "medicationHistory"));
+        request.setAdditionalDiagnoses(stringList(root, "additionalDiagnoses"));
+        request.setMedicationHistory(stringList(root, "medicationHistory"));
         request.setPatientRecords(text(root, "patientRecords"));
         request.setConfirm(booleanValue(root, "confirm"));
         return request;
+    }
+
+    private List<String> stringList(JsonNode root, String fieldName) {
+        JsonNode value = root.get(fieldName);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isArray()) {
+            throw new IllegalArgumentException(fieldName + " must be an array of strings");
+        }
+        List<String> result = new ArrayList<>();
+        for (JsonNode item : value) {
+            if (!item.isTextual()) {
+                throw new IllegalArgumentException(fieldName + " must contain only strings");
+            }
+            result.add(item.asText());
+        }
+        return result;
     }
 
     private String text(JsonNode root, String fieldName) {

@@ -9,7 +9,4 @@ public final class Icd10Codes {
 
     public static final String REGEX = "^" + CODE + "$";
 
-    // Empty string, or one-or-more CODE separated by commas (optional surrounding whitespace).
-    public static final String LIST_REGEX =
-            "^(?:\\s*)$|^" + CODE + "(?:\\s*,\\s*" + CODE + ")*$";
 }

@@ -121,8 +121,10 @@ public class CarePlanGenerationService {
                 order.getProvider().getNpi(),
                 order.getMedicationName(),
                 order.getPrimaryDiagnosis() != null ? order.getPrimaryDiagnosis() : "N/A",
-                order.getAdditionalDiagnosis() != null ? order.getAdditionalDiagnosis() : "N/A",
-                order.getMedicationHistory() != null ? order.getMedicationHistory() : "N/A",
+                (order.getAdditionalDiagnoses() == null || order.getAdditionalDiagnoses().isEmpty())
+                        ? "N/A" : String.join(", ", order.getAdditionalDiagnoses()),
+                (order.getMedicationHistory() == null || order.getMedicationHistory().isEmpty())
+                        ? "N/A" : String.join(", ", order.getMedicationHistory()),
                 order.getPatientRecords() != null ? order.getPatientRecords() : "N/A"
         );
     }

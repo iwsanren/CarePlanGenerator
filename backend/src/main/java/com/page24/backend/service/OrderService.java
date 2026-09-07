@@ -175,7 +175,7 @@ public class OrderService {
         order.setProvider(provider);
         order.setMedicationName(request.getMedicationName());
         order.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
-        order.setAdditionalDiagnosis(request.getAdditionalDiagnosis());
+        order.setAdditionalDiagnoses(request.getAdditionalDiagnoses());
         order.setMedicationHistory(request.getMedicationHistory());
         order.setPatientRecords(request.getPatientRecords());
         order = orderRepository.save(order);

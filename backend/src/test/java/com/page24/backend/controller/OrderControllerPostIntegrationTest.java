@@ -183,8 +183,8 @@ class OrderControllerPostIntegrationTest {
                   "providerNpi": "%s",
                   "medicationName": "%s",
                   "primaryDiagnosis": "G70.00",
-                  "additionalDiagnosis": "I10",
-                  "medicationHistory": "Prednisone",
+                  "additionalDiagnoses": ["I10"],
+                  "medicationHistory": ["Prednisone"],
                   "patientRecords": "Integration test record",
                   "confirm": %s
                 }

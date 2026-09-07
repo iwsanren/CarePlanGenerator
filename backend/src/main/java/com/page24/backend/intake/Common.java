@@ -31,28 +31,6 @@ public final class Common {
 		return LocalDate.parse(dateText.trim(), US_DATE);
 	}
 
-	public static String joinByComma(List<String> values) {
-		if (values == null || values.isEmpty()) {
-			return null;
-		}
-		return values.stream()
-				.filter(Objects::nonNull)
-				.map(String::trim)
-				.filter(s -> !s.isEmpty())
-				.collect(Collectors.joining(", "));
-	}
-
-	public static String joinByNewLine(List<String> values) {
-		if (values == null || values.isEmpty()) {
-			return null;
-		}
-		return values.stream()
-				.filter(Objects::nonNull)
-				.map(String::trim)
-				.filter(s -> !s.isEmpty())
-				.collect(Collectors.joining("\n"));
-	}
-
 	public static List<String> safeList(List<String> values) {
 		return values == null ? Collections.emptyList() : values;
 	}

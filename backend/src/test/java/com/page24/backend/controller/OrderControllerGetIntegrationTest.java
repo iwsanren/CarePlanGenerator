@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -194,8 +195,8 @@ class OrderControllerGetIntegrationTest {
         order.setProvider(orderProvider);
         order.setMedicationName("IVIG");
         order.setPrimaryDiagnosis("G70.00");
-        order.setAdditionalDiagnosis("I10");
-        order.setMedicationHistory("Prednisone");
+        order.setAdditionalDiagnoses(List.of("I10"));
+        order.setMedicationHistory(List.of("Prednisone"));
         order.setPatientRecords("Test record");
         order = orderRepository.save(order);
 

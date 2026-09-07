@@ -3,6 +3,7 @@ package com.page24.backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -26,11 +27,23 @@ public class Order {
     @Column(name = "primary_diagnosis")
     private String primaryDiagnosis;
 
-    @Column(name = "additional_diagnosis", columnDefinition = "TEXT")
-    private String additionalDiagnosis;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "order_additional_diagnoses",
+            joinColumns = @JoinColumn(name = "order_id")
+    )
+    @OrderColumn(name = "diagnosis_order")
+    @Column(name = "diagnosis_code")
+    private List<String> additionalDiagnoses;
 
-    @Column(name = "medication_history", columnDefinition = "TEXT")
-    private String medicationHistory;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "order_medication_history",
+            joinColumns = @JoinColumn(name = "order_id")
+    )
+    @OrderColumn(name = "entry_order")
+    @Column(name = "medication_entry", length = 500)
+    private List<String> medicationHistory;
 
     @Column(name = "patient_records", columnDefinition = "TEXT")
     private String patientRecords;

@@ -57,8 +57,8 @@ public class PharmaCorp {
 
         request.setMedicationName(payload.getMedicationName());
         request.setPrimaryDiagnosis(payload.getPrimaryDiagnosis());
-        request.setAdditionalDiagnosis(Common.joinByComma(payload.getSecondaryDiagnoses()));
-        request.setMedicationHistory(Common.joinByNewLine(payload.getMedicationHistory()));
+        request.setAdditionalDiagnoses(payload.getSecondaryDiagnoses());
+        request.setMedicationHistory(payload.getMedicationHistory());
         request.setPatientRecords(payload.getClinicalNotes());
         request.setConfirm(Boolean.TRUE.equals(confirm));
 

@@ -1,7 +1,9 @@
 package com.page24.backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+//import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Positive;
@@ -44,9 +46,14 @@ public class CreateOrderRequest {
     @Pattern(regexp = Icd10Codes.REGEX, message = "primaryDiagnosis must be a valid ICD-10 code")
     private String primaryDiagnosis;
 
-    @Pattern(regexp = Icd10Codes.LIST_REGEX, message = "additionalDiagnosis must be comma-separated ICD-10 codes")
-    private String additionalDiagnosis;
-    private String medicationHistory;
+    private List<
+            @Pattern(regexp = Icd10Codes.REGEX, message = "additionalDiagnoses must contain valid ICD-10 codes")
+                    String
+            > additionalDiagnoses;
+    private List<
+            @Size(max = 500, message = "each medicationHistory entry must be at most 500 characters")
+                    String
+            > medicationHistory;
     private String patientRecords;
 
     // Allows submission after the user acknowledges a warning, such as a same-medication refill on a different day.

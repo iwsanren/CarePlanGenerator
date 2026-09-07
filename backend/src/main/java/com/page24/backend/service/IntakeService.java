@@ -102,9 +102,8 @@ public class IntakeService {
 
         request.setMedicationName(internalOrder.getMedication().getName());
         request.setPrimaryDiagnosis(internalOrder.getDiagnosis().getPrimaryDiagnosis());
-        request.setAdditionalDiagnosis(Common.joinByComma(internalOrder.getDiagnosis().getAdditionalDiagnoses()));
-
-        request.setMedicationHistory(Common.joinByNewLine(medicationHistory));
+        request.setAdditionalDiagnoses(internalOrder.getDiagnosis().getAdditionalDiagnoses());
+        request.setMedicationHistory(medicationHistory);
         request.setPatientRecords(clinicalNotes);
         request.setConfirm(Boolean.TRUE.equals(confirm));
 
