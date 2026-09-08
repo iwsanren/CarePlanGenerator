@@ -23,5 +23,7 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
             String lastName,
             Pageable pageable
     );
+
+    List<Patient> findByFirstNameIgnoreCaseAndLastNameIgnoreCase(String firstName, String lastName);
 }
 
