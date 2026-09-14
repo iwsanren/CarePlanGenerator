@@ -104,7 +104,7 @@ public class OrderService {
             Patient matched = patientByMrn.get();
             boolean sameName = sameText(matched.getFirstName(), request.getPatientFirstName())
                     && sameText(matched.getLastName(), request.getPatientLastName());
-            // A request without a DOB is treated as "matches" (Phase 2 Part 2 decision).
+            // A request without a DOB is treated as "matches"
             boolean sameDob = request.getPatientDateOfBirth() == null
                     || (matched.getDateOfBirth() != null
                         && matched.getDateOfBirth().equals(request.getPatientDateOfBirth()));
