@@ -2,6 +2,7 @@ package com.page24.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 public class QueueService implements CarePlanQueue {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Redis list key used for queued CarePlan IDs.
     private static final String QUEUE_NAME = "careplan:queue";
@@ -37,6 +39,11 @@ public class QueueService implements CarePlanQueue {
         redisTemplate.opsForList().rightPush(QUEUE_NAME, carePlanId.toString());
 
         log.info("✅ Care Plan enqueued; current queue size: {}", getQueueSize());
+
+        // Trigger the worker immediately instead of waiting for its poll interval.
+        // See CarePlanWorker.onCarePlanQueued for why this fires AFTER the
+        // enclosing transaction commits and on a separate thread.
+        eventPublisher.publishEvent(new CarePlanQueuedEvent(carePlanId));
     }
 
     /**

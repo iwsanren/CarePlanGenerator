@@ -5,20 +5,27 @@ import com.page24.backend.repository.CarePlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Care Plan worker that pulls tasks from the Redis queue.
+ * Care Plan worker. Two ways it gets triggered:
  *
- * Responsibilities, analogous to a Celery setup:
+ * 1. onCarePlanQueued — event-driven, near-instant pickup. Fires after the
+ *    enqueuing transaction commits (so the CarePlan row is guaranteed to be
+ *    visible), and on a dedicated thread (so it never blocks the HTTP
+ *    request that created the order).
+ * 2. pollQueue — a 30s backstop. Under normal operation the queue is already
+ *    empty by the time this runs; it only does real work if an event was
+ *    missed (e.g. app restart with tasks left over in Redis from before).
  *
- *   CarePlanWorker            - equivalent to a Celery worker process that pulls tasks.
- *   CarePlanGenerationService - equivalent to a Celery task function that processes and retries tasks.
- *
- * The worker has two responsibilities:
- * 1. Pull one task from Redis every five seconds.
- * 2. Delegate it to CarePlanGenerationService, which handles the LLM call and retries.
+ * Both paths funnel into drainQueue(), which processes every task currently
+ * sitting in the queue (not just one) — Redis's leftPop is atomic, so it is
+ * safe for the event trigger and the poll trigger to call drainQueue()
+ * concurrently without double-processing the same task.
  */
 @Service
 @Profile("!lambda")
@@ -30,36 +37,35 @@ public class CarePlanWorker {
     private final CarePlanRepository carePlanRepository;
     private final CarePlanGenerationService carePlanGenerationService;
 
-    /**
-     * Runs every five seconds and processes one task from the queue.
-     *
-     * With fixedDelay = 5000, the next invocation begins five seconds after the
-     * previous one finishes, rather than on a fixed five-second schedule.
-     */
-    @Scheduled(fixedDelay = 5000)
-    public void processNextTask() {
+    @Async("carePlanTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onCarePlanQueued(CarePlanQueuedEvent event) {
+        log.info("⚡ Event-triggered drain (carePlanId={})", event.carePlanId());
+        drainQueue();
+    }
 
-        // Step 1: Pull a task from Redis and return when the queue is empty.
-        Long carePlanId = queueService.dequeue();
-        if (carePlanId == null) {
-            return;
+    @Scheduled(fixedDelay = 30000)
+    public void pollQueue() {
+        drainQueue();
+    }
+
+    private void drainQueue() {
+        Long carePlanId;
+        while ((carePlanId = queueService.dequeue()) != null) {
+            processTask(carePlanId);
         }
+    }
 
+    private void processTask(Long carePlanId) {
         log.info("🔄 Worker picked up task: carePlanId={}", carePlanId);
 
-        // Step 2: Mark the CarePlan as PROCESSING before generation begins.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.PROCESSING);
             carePlanRepository.save(carePlan);
         });
         log.info("⚙️  Status updated to PROCESSING: carePlanId={}", carePlanId);
 
-        // Step 3: Delegate processing to GenerationService.
-        // Its @Retryable annotation handles retries for failures.
+        // @Retryable on this method handles transient failure retries.
         carePlanGenerationService.generateWithRetry(carePlanId);
-
-        // The frontend is not notified when processing finishes.
-        // The user must refresh manually to see the COMPLETED status.
-        // This intentional limitation is addressed with polling on the next day.
     }
 }
