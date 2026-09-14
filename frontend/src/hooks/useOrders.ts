@@ -1,9 +1,6 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { orderService } from '@/services/orderService'
-import type { OrderListParams } from '@/types'
-
-/** The Error shape produced by the axios interceptor in services/api.ts */
-type ApiError = Error & { code?: string; status?: number }
+import type { ApiError, ConfirmationRequiredDetail, CreateOrderRequest, OrderListParams } from '@/types'
 
 /**
  * True when the backend reported that the requested order id does not exist.
@@ -48,5 +45,35 @@ export function useOrder(id: number) {
         // A missing order will never succeed on retry, so fail fast for it.
         // Genuine transient errors (a network blip) still get one retry.
         retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 1,
+    })
+}
+
+/** True when the backend hard-blocked the request (HTTP 409) — no confirm option. */
+export function isBlockedError(error: unknown): boolean {
+    return (error as ApiError)?.type === 'block'
+}
+
+/**
+ * True when the backend returned "confirmation required" (HTTP 200,
+ * code CONFIRMATION_REQUIRED). Narrows the error's type so callers can read
+ * `error.detail.warnings` without an extra cast.
+ */
+export function isConfirmationRequiredError(
+    error: unknown,
+): error is ApiError & { detail: ConfirmationRequiredDetail } {
+    return (error as ApiError)?.type === 'warning' && (error as ApiError)?.code === 'CONFIRMATION_REQUIRED'
+}
+
+/** useMutation (react-query) — the write-side counterpart to useQuery: it does
+ *  not fetch automatically, you call `mutate`/`mutateAsync` to trigger it. */
+export function useCreateOrder() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (payload: CreateOrderRequest) => orderService.createOrder(payload),
+        onSuccess: () => {
+            // Invalidate the cached orders list so OrdersPage refetches and
+            // shows the new order next time it is visited.
+            queryClient.invalidateQueries({ queryKey: ['orders'] })
+        },
     })
 }

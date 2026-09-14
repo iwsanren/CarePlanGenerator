@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from 'react-router-dom'
 import { CheckCircle, XCircle } from 'lucide-react'
 
 import { FormField } from '@/components/forms/FormField'
@@ -7,8 +9,10 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+import { useCreateOrder, isBlockedError, isConfirmationRequiredError } from '@/hooks/useOrders'
 import { orderFormSchema, type OrderFormInput, type OrderFormValues } from '@/utils/orderFormSchema'
-import { isValidNPI, isValidICD10 } from '@/utils/validators'
+import { isValidNPI, isValidICD10, linesToList } from '@/utils/validators'
+import type { ApiError, CreateOrderRequest, Warning } from '@/types'
 
 export function NewOrderPage() {
     // useForm (react-hook-form, see glossary) owns all field values + validation
@@ -36,11 +40,63 @@ export function NewOrderPage() {
     const icdTouched = Boolean(touchedFields.primaryDiagnosis) || (primaryDiagnosisValue?.length ?? 0) > 0
     const icdIsValid = isValidICD10(primaryDiagnosisValue ?? '')
 
+    const navigate = useNavigate()
+    const createOrder = useCreateOrder()
+
+    // State kept across the "confirmation required" round trip:
+    // - pendingSubmission: the exact payload we sent, so "Continue Anyway" can resend it with confirm:true
+    // - blockedMessage: set when the backend hard-blocked us (409)
+    // - pendingWarnings: set when the backend needs a human decision (200, CONFIRMATION_REQUIRED)
+    const [pendingSubmission, setPendingSubmission] = useState<CreateOrderRequest | null>(null)
+    const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
+    const [pendingWarnings, setPendingWarnings] = useState<Warning[] | null>(null)
+
+    function toRequestPayload(values: OrderFormValues, confirm: boolean): CreateOrderRequest {
+        return {
+            patientFirstName: values.patientFirstName,
+            patientLastName: values.patientLastName,
+            patientMrn: values.patientMrn,
+            patientDateOfBirth: values.patientDateOfBirth || undefined,
+            patientSex: values.patientSex || undefined,
+            patientWeightKg: values.patientWeightKg === '' ? undefined : Number(values.patientWeightKg),
+            patientAllergies: values.patientAllergies || undefined,
+            providerName: values.providerName,
+            providerNpi: values.providerNpi,
+            medicationName: values.medicationName,
+            primaryDiagnosis: values.primaryDiagnosis,
+            additionalDiagnoses: linesToList(values.additionalDiagnosesText ?? ''),
+            medicationHistory: linesToList(values.medicationHistoryText ?? ''),
+            patientRecords: values.patientRecords || undefined,
+            confirm,
+        }
+    }
+
+    async function submit(payload: CreateOrderRequest) {
+        try {
+            const order = await createOrder.mutateAsync(payload)
+            navigate(`/orders/${order.id}`)
+        } catch (err) {
+            if (isBlockedError(err)) {
+                setBlockedMessage((err as ApiError).message)
+            } else if (isConfirmationRequiredError(err)) {
+                setPendingSubmission(payload) // remember it -- see the closure note in Section 3
+                setPendingWarnings(err.detail.warnings)
+            }
+            // any other error type: falls through silently for now; a generic
+            // inline error banner can be added later if it turns out to matter
+        }
+    }
+
     // handleSubmit wraps our function: react-hook-form only calls it once
     // validation has passed, and passes the parsed, typed values in.
-    const onSubmit = handleSubmit((values) => {
-        console.log('form values (submit wiring comes in Part 4):', values)
-    })
+    const onSubmit = handleSubmit((values) => submit(toRequestPayload(values, false)))
+
+    function handleContinueAnyway() {
+        if (!pendingSubmission) return
+        const retryPayload = { ...pendingSubmission, confirm: true }
+        setPendingWarnings(null)
+        submit(retryPayload)
+    }
 
     return (
         <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-8">
@@ -155,6 +211,22 @@ export function NewOrderPage() {
                     <Textarea {...register('patientRecords')} rows={5} />
                 </FormField>
             </section>
+
+            {/* Bare-bones rendering of the two error states so the submit plumbing is
+                visible/testable now -- Part 5 replaces this with a real modal component. */}
+            {blockedMessage && (
+                <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{blockedMessage}</p>
+            )}
+            {pendingWarnings && (
+                <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                    {pendingWarnings.map((w) => (
+                        <p key={w.code}>{w.message}</p>
+                    ))}
+                    <Button type="button" size="sm" onClick={handleContinueAnyway}>
+                        Continue Anyway
+                    </Button>
+                </div>
+            )}
 
             <Button type="submit" size="lg">
                 Create Order
