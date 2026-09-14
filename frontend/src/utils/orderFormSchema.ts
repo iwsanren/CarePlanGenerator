@@ -25,4 +25,9 @@ export const orderFormSchema = z.object({
     patientRecords: z.string().optional(),
 })
 
+// zod v4 tracks two shapes per schema: the raw shape a form field holds before
+// validation ("input" -- patientWeightKg is a string here, e.g. "70" or ""),
+// and the shape z.coerce.number() produces after validation ("output" -- a
+// real number). z.infer is an alias for the output shape.
 export type OrderFormValues = z.infer<typeof orderFormSchema>
+export type OrderFormInput = z.input<typeof orderFormSchema>
