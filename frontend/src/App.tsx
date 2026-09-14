@@ -9,8 +9,8 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<NewOrderPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
       </Routes>
     </Layout>
   )
