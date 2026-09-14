@@ -4,6 +4,56 @@ export type OrderStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type ResultType = 'SUCCESS' | 'WARNING'
 
 /** Response body for POST /orders (201) and GET /orders/{id} (200) */
+/** One duplicate-detection warning returned by the backend. */
+export interface Warning {
+    code: string
+    message: string
+    actionRequired: boolean
+}
+
+/** Shape of the JSON body the backend's ApiErrorResponse serializes to. */
+export interface ApiErrorBody {
+    type?: 'block' | 'warning' | 'validation' | 'error'
+    code?: string
+    message?: string
+    detail?: unknown
+    httpStatus?: number
+}
+
+/** The Error shape thrown by the axios interceptor in services/api.ts. */
+export type ApiError = Error & {
+    type?: ApiErrorBody['type']
+    code?: string
+    detail?: unknown
+    status?: number   // the real HTTP status code, read from the transport layer
+}
+
+/** detail payload on a CONFIRMATION_REQUIRED (type: "warning") error */
+export interface ConfirmationRequiredDetail {
+    requiresConfirm: true
+    warnings: Warning[]
+}
+
+/** Request body for POST /orders. Field names/types match the backend's
+ *  CreateOrderRequest exactly -- no snake_case<->camelCase conversion layer. */
+export interface CreateOrderRequest {
+    patientFirstName: string
+    patientLastName: string
+    patientMrn: string
+    patientDateOfBirth?: string          // "YYYY-MM-DD", optional
+    patientSex?: string
+    patientWeightKg?: number
+    patientAllergies?: string
+    providerName: string
+    providerNpi: string
+    medicationName: string
+    primaryDiagnosis: string
+    additionalDiagnoses: string[]
+    medicationHistory: string[]
+    patientRecords?: string
+    confirm?: boolean
+}
+
 export interface OrderResponse {
     id: number
     patientId: number
@@ -13,7 +63,7 @@ export interface OrderResponse {
     carePlanContent?: string | null   // Present only when status === 'completed'
     resultType: ResultType
     message?: string | null
-    warnings: string[]                // Plain string array, not structured objects
+    warnings: Warning[]               // Structured objects since Phase 3
     requiresConfirm: boolean
 }
 

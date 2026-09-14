@@ -170,9 +170,12 @@ export function OrderDetailPage() {
                     <div className="mt-2">
                         <p className="text-sm text-gray-500">Warnings</p>
                         <ul className="mt-1 list-disc pl-5">
-                            {warnings.map((w, i) => (
-                                <li key={i} className="text-sm text-amber-700">
-                                    {w}
+                            {warnings.map((w) => (
+                                <li
+                                    key={w.code}
+                                    className={cn('text-sm', w.actionRequired ? 'text-amber-700' : 'text-blue-700')}
+                                >
+                                    {w.message}
                                 </li>
                             ))}
                         </ul>
