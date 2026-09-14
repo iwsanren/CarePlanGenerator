@@ -51,6 +51,9 @@ public class Order {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "confirmed_not_duplicate")
+    private boolean confirmedNotDuplicate = false;
+
     @PrePersist
     protected void onCreate() {
         // Keep an explicitly supplied timestamp for imports and reports; new

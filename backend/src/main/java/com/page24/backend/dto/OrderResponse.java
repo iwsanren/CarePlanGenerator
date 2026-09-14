@@ -17,10 +17,10 @@ public class OrderResponse {
     private String status;
     private String carePlanContent;
 
-    // Day 8: High-level outcome classification for the request (SUCCESS or WARNING).
+    // High-level outcome classification for the request (SUCCESS or WARNING).
     private String resultType;
     private String message;
-    private List<String> warnings;
+    private List<Warning> warnings;
     private Boolean requiresConfirm;
 }
 

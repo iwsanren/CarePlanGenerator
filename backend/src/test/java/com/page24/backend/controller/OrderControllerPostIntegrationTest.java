@@ -24,6 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -124,8 +126,10 @@ class OrderControllerPostIntegrationTest {
                         .content(validRequestJson(medication, false)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("warning"))
-                .andExpect(jsonPath("$.code").value("POTENTIAL_DUPLICATE_ORDER_CROSS_DAY"))
+                .andExpect(jsonPath("$.code").value("CONFIRMATION_REQUIRED"))
                 .andExpect(jsonPath("$.detail.requiresConfirm").value(true))
+                .andExpect(jsonPath("$.detail.warnings[0].code").value("ORDER_CROSS_DAY_DUPLICATE"))
+                .andExpect(jsonPath("$.detail.warnings[0].actionRequired").value(true))
                 .andExpect(jsonPath("$.httpStatus").value(200));
     }
 
@@ -147,7 +151,47 @@ class OrderControllerPostIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequestJson(medication, true)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.resultType").value("SUCCESS"));
+                .andExpect(jsonPath("$.resultType").value("WARNING"))
+                .andExpect(jsonPath("$.warnings[0].code").value("ORDER_CROSS_DAY_DUPLICATE"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/orders - MRN conflict needs confirmation, then succeeds with confirm=true")
+    void requiresConfirmationOnMrnConflictThenSucceeds() throws Exception {
+        // 1) create the original patient + an order for MED-A
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson("Alice", "Wong", "123456", "1990-05-10",
+                                "Dr. Green", "1111111111", "MED-A", false)))
+                .andExpect(status().isCreated());
+
+        // 2) same MRN, different first name, DIFFERENT medication (isolates the patient conflict)
+        String conflicting = requestJson("Alicia", "Wong", "123456", "1990-05-10",
+                "Dr. Green", "1111111111", "MED-B", false);
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(conflicting))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("CONFIRMATION_REQUIRED"))
+                .andExpect(jsonPath("$.detail.requiresConfirm").value(true))
+                .andExpect(jsonPath("$.detail.warnings[0].code").value("PATIENT_MRN_CONFLICT"))
+                .andExpect(jsonPath("$.detail.warnings[0].actionRequired").value(true));
+
+        assertThat(orderRepository.count()).isEqualTo(1); // gated attempt persisted nothing
+
+        // 3) resubmit with confirm=true
+        String confirmed = requestJson("Alicia", "Wong", "123456", "1990-05-10",
+                "Dr. Green", "1111111111", "MED-B", true);
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(confirmed))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultType").value("WARNING"))
+                .andExpect(jsonPath("$.warnings[0].code").value("PATIENT_MRN_CONFLICT"));
+
+        assertThat(orderRepository.count()).isEqualTo(2);
     }
 
     private String validRequestJson(String medicationName, boolean confirm) {

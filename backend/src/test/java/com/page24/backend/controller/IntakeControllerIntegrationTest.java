@@ -148,13 +148,13 @@ class IntakeControllerIntegrationTest {
                         .content(pharmaXml(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("warning"))
-                .andExpect(jsonPath("$.code").value("POTENTIAL_DUPLICATE_ORDER_CROSS_DAY"));
+                .andExpect(jsonPath("$.code").value("CONFIRMATION_REQUIRED"));
 
         mockMvc.perform(post("/api/v1/intake/pharma-corp?confirm=true")
                         .contentType(MediaType.APPLICATION_XML)
                         .content(pharmaXml(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.resultType").value("SUCCESS"));
+                .andExpect(jsonPath("$.resultType").value("WARNING"));
     }
 
     private String clinicJson(String medicationName, String npi, String mrn, String primaryDx) {

@@ -7,6 +7,7 @@ import com.page24.backend.dto.OrderMapper;
 import com.page24.backend.dto.OrderListItemResponse;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
+import com.page24.backend.dto.Warning;
 import com.page24.backend.entity.*;
 import com.page24.backend.exception.BlockError;
 import com.page24.backend.exception.CarePlanNotReadyException;
@@ -24,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,108 +68,132 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
-        List<String> warnings = new ArrayList<>();
+        List<Warning> warnings = new ArrayList<>();
 
-        // 1) Detect duplicate providers.
-        Provider provider = providerRepository.findByNpi(request.getProviderNpi())
-                .map(existingProvider -> {
-                    if (!sameText(existingProvider.getName(), request.getProviderName())) {
-                        throw new BlockError(
-                                "DUPLICATE_NPI_NAME_MISMATCH",
-                                "Provider conflict: same NPI with different provider name"
-                        );
-                    }
-                    return existingProvider;
-                })
-                .orElseGet(() -> {
-                    Provider newProvider = new Provider();
-                    newProvider.setName(request.getProviderName());
-                    newProvider.setNpi(request.getProviderNpi());
-                    return providerRepository.save(newProvider);
-                });
+        // ---------- 1) Provider detection ----------
+        Optional<Provider> providerByNpi = providerRepository.findByNpi(request.getProviderNpi());
+        Provider providerToUse = null;
+        if (providerByNpi.isPresent()) {
+            Provider matched = providerByNpi.get();
+            if (!sameText(matched.getName(), request.getProviderName())) {
+                // Same NPI, different name is a hard conflict: block (409).
+                throw new BlockError(
+                        "DUPLICATE_NPI_NAME_MISMATCH",
+                        "Provider conflict: same NPI with different provider name");
+            }
+            providerToUse = matched;
+        } else {
+            // New NPI. Look for a provider with the same surname but a different NPI:
+            // possibly the same physician entered with a mistyped or changed NPI.
+            String surname = lastNameToken(request.getProviderName());
+            boolean similarProviderExists = providerRepository
+                    .findByNameContainingIgnoreCase(surname).stream()
+                    .anyMatch(p -> surname.equalsIgnoreCase(lastNameToken(p.getName())));
+            if (similarProviderExists) {
+                warnings.add(new Warning(
+                        "PROVIDER_SIMILAR_NAME",
+                        "A provider with a similar name but a different NPI already exists",
+                        false));
+            }
+        }
 
-        // 2) Detect duplicate patients.
-        Patient patient;
-        Optional<Patient> existingByMrn = patientRepository.findByMrn(request.getPatientMrn());
-
-        if (existingByMrn.isPresent()) {
-            // existing patient
-            Patient matched = existingByMrn.get();
+        // ---------- 2) Patient detection ----------
+        Optional<Patient> patientByMrn = patientRepository.findByMrn(request.getPatientMrn());
+        Patient patientToUse = null;
+        if (patientByMrn.isPresent()) {
+            Patient matched = patientByMrn.get();
             boolean sameName = sameText(matched.getFirstName(), request.getPatientFirstName())
                     && sameText(matched.getLastName(), request.getPatientLastName());
+            // A request without a DOB is treated as "matches" (Phase 2 Part 2 decision).
             boolean sameDob = request.getPatientDateOfBirth() == null
                     || (matched.getDateOfBirth() != null
-                    && matched.getDateOfBirth().equals(request.getPatientDateOfBirth()));
-
+                        && matched.getDateOfBirth().equals(request.getPatientDateOfBirth()));
             if (!sameName || !sameDob) {
-                warnings.add("Patient warning: MRN exists but name or DOB is different");
+                warnings.add(new Warning(
+                        "PATIENT_MRN_CONFLICT",
+                        "This MRN exists but the name or date of birth does not match",
+                        true));
             }
-            patient = matched;
+            patientToUse = matched;
         } else {
-            // create a new patient
-            Optional<Patient> existingByNameDob = request.getPatientDateOfBirth() == null
-                    ? Optional.empty()
-                    : patientRepository.findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
-                    request.getPatientFirstName(),
-                    request.getPatientLastName(),
-                    request.getPatientDateOfBirth()
-            );
-
-            existingByNameDob
-                    .filter(p -> !sameText(p.getMrn(), request.getPatientMrn()))
-                    .ifPresent(p -> warnings.add("Patient warning: same name + DOB exists with different MRN"));
-
-            Patient newPatient = new Patient();
-            newPatient.setFirstName(request.getPatientFirstName());
-            newPatient.setLastName(request.getPatientLastName());
-            newPatient.setMrn(request.getPatientMrn());
-            newPatient.setDateOfBirth(request.getPatientDateOfBirth());
-            newPatient.setSex(request.getPatientSex());
-            newPatient.setWeightKg(request.getPatientWeightKg());
-            newPatient.setAllergies(request.getPatientAllergies());
-            patient = patientRepository.save(newPatient);
-        }
-
-        // 3) Detect duplicate orders.
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime nextDayStart = today.plusDays(1).atStartOfDay();
-
-        boolean samePatientMedicationSameDay = orderRepository.existsByPatientAndMedicationNameIgnoreCaseAndCreatedAtBetween(
-                patient,
-                request.getMedicationName(),
-                startOfDay,
-                nextDayStart
-        );
-
-        if (samePatientMedicationSameDay) {
-            throw new BlockError(
-                    "DUPLICATE_ORDER_SAME_DAY",
-                    "Duplicate order: same patient + same medication + same day"
-            );
-        }
-
-        Optional<Order> previousSameMedicationOrder = orderRepository
-                .findFirstByPatientAndMedicationNameIgnoreCaseOrderByCreatedAtDesc(
-                        patient,
-                        request.getMedicationName()
-                );
-
-        if (previousSameMedicationOrder.isPresent()) {
-            warnings.add("Order warning: same patient + same medication exists on a different day");
-            if (!Boolean.TRUE.equals(request.getConfirm())) {
-                Map<String, Object> detail = new LinkedHashMap<>();
-                detail.put("requiresConfirm", true);
-                detail.put("warnings", warnings);
-                throw new WarningException(
-                        "POTENTIAL_DUPLICATE_ORDER_CROSS_DAY",
-                        "Potential duplicate order detected. Resubmit with confirm=true to continue.",
-                        detail
-                );
+            boolean possibleDuplicateAdded = false;
+            if (request.getPatientDateOfBirth() != null) {
+                boolean sameNameDobDifferentMrn = patientRepository
+                        .findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirth(
+                                request.getPatientFirstName(),
+                                request.getPatientLastName(),
+                                request.getPatientDateOfBirth())
+                        .filter(p -> !sameText(p.getMrn(), request.getPatientMrn()))
+                        .isPresent();
+                if (sameNameDobDifferentMrn) {
+                    warnings.add(new Warning(
+                            "PATIENT_POSSIBLE_DUPLICATE",
+                            "A patient with the same name and date of birth but a different MRN already exists",
+                            true));
+                    possibleDuplicateAdded = true;
+                }
+            }
+            if (!possibleDuplicateAdded) {
+                boolean sameNameDifferentMrn = patientRepository
+                        .findByFirstNameIgnoreCaseAndLastNameIgnoreCase(
+                                request.getPatientFirstName(), request.getPatientLastName())
+                        .stream()
+                        .anyMatch(p -> !sameText(p.getMrn(), request.getPatientMrn()));
+                if (sameNameDifferentMrn) {
+                    warnings.add(new Warning(
+                            "PATIENT_SIMILAR_NAME",
+                            "A patient with the same name but a different MRN already exists",
+                            false));
+                }
             }
         }
 
-        // 4) Create the order.
+        // ---------- 3) Order detection (only an existing patient can have prior orders) ----------
+        if (patientToUse != null) {
+            LocalDate today = LocalDate.now();
+            boolean sameDay = orderRepository
+                    .existsByPatientAndMedicationNameIgnoreCaseAndCreatedAtBetween(
+                            patientToUse, request.getMedicationName(),
+                            today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+            if (sameDay) {
+                // Same patient + same medication + same day is a hard conflict: block (409).
+                throw new BlockError(
+                        "DUPLICATE_ORDER_SAME_DAY",
+                        "Duplicate order: same patient + same medication + same day");
+            }
+            boolean crossDay = orderRepository
+                    .findFirstByPatientAndMedicationNameIgnoreCaseOrderByCreatedAtDesc(
+                            patientToUse, request.getMedicationName())
+                    .isPresent();
+            if (crossDay) {
+                warnings.add(new Warning(
+                        "ORDER_CROSS_DAY_DUPLICATE",
+                        "The same patient already has an order for this medication on a different day",
+                        true));
+            }
+        }
+
+        // ---------- 4) Confirmation gate ----------
+        // If any warning needs action and the caller has not confirmed, stop here.
+        boolean requiresConfirm = warnings.stream().anyMatch(Warning::actionRequired);
+        if (requiresConfirm && !Boolean.TRUE.equals(request.getConfirm())) {
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("requiresConfirm", true);
+            detail.put("warnings", warnings);
+            throw new WarningException(
+                    "CONFIRMATION_REQUIRED",
+                    "Potential duplicate detected. Resubmit with confirm=true to continue.",
+                    detail);
+        }
+
+        // ---------- 5) Persist ----------
+        Provider provider = (providerToUse != null)
+                ? providerToUse
+                : providerRepository.save(newProvider(request));
+        Patient patient = (patientToUse != null)
+                ? patientToUse
+                : patientRepository.save(newPatient(request));
+
         Order order = new Order();
         order.setPatient(patient);
         order.setProvider(provider);
@@ -178,22 +202,26 @@ public class OrderService {
         order.setAdditionalDiagnoses(request.getAdditionalDiagnoses());
         order.setMedicationHistory(request.getMedicationHistory());
         order.setPatientRecords(request.getPatientRecords());
+        // Audit flag: true only when a human confirmed past an action-required warning.
+        order.setConfirmedNotDuplicate(requiresConfirm && Boolean.TRUE.equals(request.getConfirm()));
         order = orderRepository.save(order);
 
-        // 5) Create a CarePlan in the PENDING state.
         CarePlan carePlan = new CarePlan();
         carePlan.setOrder(order);
         carePlan.setStatus(CarePlan.Status.PENDING);
         carePlan = carePlanRepository.save(carePlan);
 
-        // 6) Enqueue the task. Redis is used locally; the AWS Lambda profile uses SQS.
+        // Redis locally; the AWS Lambda profile uses SQS.
         carePlanQueue.enqueue(carePlan.getId());
 
+        // ---------- 6) Build response ----------
         OrderResponse response = orderMapper.toResponse(order, carePlan);
         if (!warnings.isEmpty()) {
+            response.setResultType("WARNING");
             response.setMessage("Order created with warnings");
             response.setWarnings(warnings);
         }
+        response.setRequiresConfirm(false);
         return response;
     }
 
@@ -202,6 +230,34 @@ public class OrderService {
             return left == null && right == null;
         }
         return left.trim().equalsIgnoreCase(right.trim());
+    }
+
+    /** Last whitespace-delimited token of a name, used as the surname for similar-name matching. */
+    private static String lastNameToken(String name) {
+        if (name == null || name.isBlank()) {
+            return "";
+        }
+        String[] parts = name.trim().split("\\s+");
+        return parts[parts.length - 1];
+    }
+
+    private Provider newProvider(CreateOrderRequest request) {
+        Provider provider = new Provider();
+        provider.setName(request.getProviderName());
+        provider.setNpi(request.getProviderNpi());
+        return provider;
+    }
+
+    private Patient newPatient(CreateOrderRequest request) {
+        Patient patient = new Patient();
+        patient.setFirstName(request.getPatientFirstName());
+        patient.setLastName(request.getPatientLastName());
+        patient.setMrn(request.getPatientMrn());
+        patient.setDateOfBirth(request.getPatientDateOfBirth());
+        patient.setSex(request.getPatientSex());
+        patient.setWeightKg(request.getPatientWeightKg());
+        patient.setAllergies(request.getPatientAllergies());
+        return patient;
     }
 
     /**
