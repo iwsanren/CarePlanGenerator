@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: careplan-postgres
+    environment:
+      POSTGRES_DB: careplan
+      POSTGRES_USER: careplan_user
+      POSTGRES_PASSWORD: careplan_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careplan_user -d careplan"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: careplan-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: careplan-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/careplan
+      SPRING_DATASOURCE_USERNAME: careplan_user
+      SPRING_DATASOURCE_PASSWORD: careplan_password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: careplan-frontend
+    depends_on:
+      - backend
+    environment:
+      # Container-to-container hostname, not localhost -- see vite.config.ts
+      VITE_BACKEND_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind-mount source for hot reload; anonymous volume keeps the
+      # container's own node_modules (built for linux) from being
+      # shadowed by the host's (which may hold windows/mac binaries)
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

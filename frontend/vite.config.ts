@@ -13,7 +13,9 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // Overridden to the "backend" service name when run via docker-compose,
+        // since "localhost" inside the frontend container means the container itself.
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8080',
         changeOrigin: true,
       },
     },
