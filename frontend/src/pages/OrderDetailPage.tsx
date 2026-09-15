@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 
-import { useOrder, isNotFoundError } from '@/hooks/useOrders'
+import { useOrder, useCarePlanStatus, isNotFoundError } from '@/hooks/useOrders'
 import { cn, getStatusColor } from '@/utils/utils'
 import type { OrderResponse } from '@/types'
 
@@ -59,7 +62,13 @@ function NotFoundCard() {
 }
 
 /** The body of the "Care Plan" card — one branch per order status. */
-function CarePlanSection({ order }: { order: OrderResponse }) {
+function CarePlanSection({
+    order,
+    statusPreview,
+}: {
+    order: OrderResponse
+    statusPreview?: string
+}) {
     switch (order.status) {
         case 'pending':
             return (
@@ -69,9 +78,15 @@ function CarePlanSection({ order }: { order: OrderResponse }) {
             )
         case 'processing':
             return (
-                <p className="text-sm text-blue-600">
-                    Generating… refresh the page to check. (Live polling comes in a later step.)
-                </p>
+                <div className="flex items-start gap-2 text-sm text-blue-600">
+                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                    <div>
+                        <p>Generating care plan…</p>
+                        {statusPreview && (
+                            <p className="mt-1 text-xs text-gray-500">{statusPreview}</p>
+                        )}
+                    </div>
+                </div>
             )
         case 'completed':
             return order.carePlanContent ? (
@@ -104,8 +119,21 @@ export function OrderDetailPage() {
     // (or undefined), so we convert it to a number for the hook.
     const { id: idParam } = useParams()
     const id = Number(idParam)
+    const queryClient = useQueryClient()
 
+    // Both hooks must run unconditionally, before any early `return` below —
+    // React requires hooks to be called in the same order on every render.
     const { data, isLoading, isError, error } = useOrder(id)
+    const { data: statusData } = useCarePlanStatus(id)
+
+    // Once polling reports a terminal state, refetch the full order so
+    // carePlanContent (only present on GET /orders/{id}, not on the status
+    // endpoint) shows up without the user manually reloading.
+    useEffect(() => {
+        if (statusData?.status === 'completed' || statusData?.status === 'failed') {
+            queryClient.invalidateQueries({ queryKey: ['order', id] })
+        }
+    }, [statusData?.status, id, queryClient])
 
     // 1) The route param wasn't a number at all (e.g. /orders/abc): nothing to fetch.
     if (!Number.isFinite(id)) return <NotFoundCard />
@@ -185,7 +213,7 @@ export function OrderDetailPage() {
 
             {/* Card B: Care Plan */}
             <Card title="Care Plan">
-                <CarePlanSection order={order} />
+                <CarePlanSection order={order} statusPreview={statusData?.carePlanPreview} />
             </Card>
 
             {/* Card C: References — placeholder until patient / provider endpoints are wired */}

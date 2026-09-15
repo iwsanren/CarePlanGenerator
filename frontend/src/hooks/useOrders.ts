@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { orderService } from '@/services/orderService'
-import type { ApiError, ConfirmationRequiredDetail, CreateOrderRequest, OrderListParams } from '@/types'
+import type {
+    ApiError,
+    ConfirmationRequiredDetail,
+    CreateOrderRequest,
+    OrderListParams,
+    OrderStatus,
+} from '@/types'
+
+// Statuses that mean "still working" — polling continues while the backend reports one of these.
+const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'processing']
 
 /**
  * True when the backend reported that the requested order id does not exist.
@@ -74,6 +83,25 @@ export function useCreateOrder() {
             // Invalidate the cached orders list so OrdersPage refetches and
             // shows the new order next time it is visited.
             queryClient.invalidateQueries({ queryKey: ['orders'] })
+        },
+    })
+}
+
+/**
+ * useCarePlanStatus — polls GET /orders/{id}/status every 3s while the order
+ * is pending/processing, and stops automatically once it reaches a terminal
+ * state (completed/failed). react-query's refetchInterval is a function here
+ * so it can inspect the *latest fetched* status on every tick and decide
+ * whether to keep going, instead of a fixed interval that never turns off.
+ */
+export function useCarePlanStatus(id: number) {
+    return useQuery({
+        queryKey: ['carePlanStatus', id],
+        queryFn: () => orderService.getCarePlanStatus(id),
+        enabled: Number.isFinite(id),
+        refetchInterval: (query) => {
+            const status = query.state.data?.status
+            return status && ACTIVE_STATUSES.includes(status) ? 3000 : false
         },
     })
 }

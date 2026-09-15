@@ -2,6 +2,7 @@ import api from '@/services/api'
 import type {
     ApiError,
     ApiErrorBody,
+    CarePlanStatus,
     CreateOrderRequest,
     OrderListItem,
     OrderListParams,
@@ -63,6 +64,15 @@ export const orderService = {
         return {
             ...order,
             status: String(order.status).toLowerCase() as OrderStatus,
+        }
+    },
+
+    /** GET /orders/{id}/status — lightweight polling endpoint used while a care plan is generating. */
+    async getCarePlanStatus(id: number): Promise<CarePlanStatus> {
+        const response = await api.get<CarePlanStatus>(`/orders/${id}/status`)
+        return {
+            ...response.data,
+            status: String(response.data.status).toLowerCase() as OrderStatus,
         }
     },
 }
