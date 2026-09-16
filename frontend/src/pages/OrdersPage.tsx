@@ -77,7 +77,8 @@ export function OrdersPage() {
                     <Button
                         variant="outline"
                         onClick={() =>
-                            window.open('/api/v1/reports/orders/export', '_blank')
+                            // Full, unfiltered export including care plan content — see backend ExportController.
+                            window.open('/api/v1/export', '_blank')
                         }
                     >
                         <Download className="mr-2 h-4 w-4" />
