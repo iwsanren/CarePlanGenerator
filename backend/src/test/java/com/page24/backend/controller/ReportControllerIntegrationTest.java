@@ -11,6 +11,7 @@ import com.page24.backend.repository.ProviderRepository;
 import com.page24.backend.service.DataInitializationService;
 import com.page24.backend.service.QueueService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -112,7 +113,30 @@ class ReportControllerIntegrationTest {
                 .andExpect(jsonPath("$.code").value("INVALID_EXPORT_FORMAT"));
     }
 
-    private void createOrder(
+    @Test
+    @DisplayName("every column of a single completed order is correct (Care Plan Updated At is excluded — it's a save-time timestamp, not deterministic here)")
+    void assertsEveryColumnForASingleOrder() throws Exception {
+        Order order = createOrder("Carol", "Diaz", "100003", "Xolair", CarePlan.Status.COMPLETED,
+                LocalDateTime.of(2026, 9, 1, 10, 30));
+
+        String expectedRowPrefix = String.join(",",
+                "\"" + order.getId() + "\"",
+                "\"2026-09-01 10:30:00\"",
+                "\"COMPLETED\"",
+                "\"100003\"",
+                "\"Carol Diaz\"",
+                "\"1990-01-01\"",
+                "\"Xolair\"",
+                "\"G70.00\"",
+                "\"1111111111\"",
+                "\"Dr. Green\"");   // row continues with the non-deterministic "Care Plan Updated At" cell
+
+        mockMvc.perform(get("/api/v1/reports/orders/export").param("provider_id", provider.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(expectedRowPrefix)));
+    }
+
+    private Order createOrder(
             String firstName,
             String lastName,
             String mrn,
@@ -139,5 +163,7 @@ class ReportControllerIntegrationTest {
         carePlan.setOrder(order);
         carePlan.setStatus(status);
         carePlanRepository.save(carePlan);
+
+        return order;
     }
 }
