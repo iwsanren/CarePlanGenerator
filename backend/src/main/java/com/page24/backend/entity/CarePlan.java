@@ -30,6 +30,15 @@ public class CarePlan {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    /** True when this content was manually uploaded rather than LLM-generated.
+     *  Field is named `uploaded` (not `isUploaded`) so Lombok generates the
+     *  unambiguous isUploaded()/setUploaded() accessor pair.
+     *  `columnDefinition` gives the column a DB-level default so ddl-auto=update
+     *  backfills existing rows instead of leaving them NULL, which would crash
+     *  Hibernate when it tries to bind NULL into a primitive boolean field. */
+    @Column(name = "is_uploaded", nullable = false, columnDefinition = "boolean default false")
+    private boolean uploaded = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

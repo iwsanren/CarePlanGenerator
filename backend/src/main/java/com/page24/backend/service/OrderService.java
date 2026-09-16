@@ -22,7 +22,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -223,6 +225,92 @@ public class OrderService {
         }
         response.setRequiresConfirm(false);
         return response;
+    }
+
+    /** Blocks any manual mutation (regenerate/upload) while a generation is already in flight. */
+    private void ensureCarePlanNotBusy(CarePlan carePlan) {
+        if (carePlan.getStatus() == CarePlan.Status.PROCESSING) {
+            throw new BlockError(
+                    "CAREPLAN_ALREADY_PROCESSING",
+                    "A care plan generation is already in progress for this order");
+        }
+    }
+
+    /**
+     * Resets a completed/failed CarePlan back to PENDING and re-enqueues it.
+     * Reuses the Phase 5 event-driven pipeline unchanged: enqueue() publishes
+     * CarePlanQueuedEvent, and CarePlanWorker picks it up right after this
+     * transaction commits.
+     */
+    @Transactional
+    public OrderResponse regenerateCarePlan(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        CarePlan carePlan = carePlanRepository.findByOrderId(id)
+                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
+
+        ensureCarePlanNotBusy(carePlan);
+        if (carePlan.getStatus() == CarePlan.Status.PENDING) {
+            // Nothing has run yet — "regenerate" implies there was a first attempt to redo.
+            throw new BlockError(
+                    "CAREPLAN_NOT_READY_FOR_REGENERATION",
+                    "This order has not finished its first generation yet");
+        }
+
+        carePlan.setStatus(CarePlan.Status.PENDING);
+        carePlan.setContent(null);
+        carePlan.setErrorMessage(null);
+        carePlan.setUploaded(false);   // a fresh LLM run replaces any prior manual upload
+        carePlanRepository.save(carePlan);
+
+        carePlanQueue.enqueue(carePlan.getId());
+
+        return orderMapper.toResponse(order, carePlan);
+    }
+
+    /**
+     * Replaces a CarePlan's content with manually supplied text, marking it uploaded.
+     * Exactly one of `content` (pasted text) or `file` must be provided.
+     */
+    @Transactional
+    public OrderResponse uploadCarePlan(Long id, String content, MultipartFile file) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        CarePlan carePlan = carePlanRepository.findByOrderId(id)
+                .orElseThrow(() -> new ValidationError("CAREPLAN_NOT_FOUND", "CarePlan not found"));
+
+        ensureCarePlanNotBusy(carePlan);
+
+        String effectiveContent = extractUploadedContent(content, file);
+
+        carePlan.setContent(effectiveContent);
+        carePlan.setStatus(CarePlan.Status.COMPLETED);
+        carePlan.setErrorMessage(null);
+        carePlan.setUploaded(true);
+        carePlanRepository.save(carePlan);
+
+        return orderMapper.toResponse(order, carePlan);
+    }
+
+    private String extractUploadedContent(String content, MultipartFile file) {
+        boolean hasText = content != null && !content.isBlank();
+        boolean hasFile = file != null && !file.isEmpty();
+
+        if (hasText == hasFile) {
+            // Both true (ambiguous) or both false (nothing provided) — either way, reject.
+            throw new ValidationError(
+                    "CAREPLAN_UPLOAD_INVALID",
+                    "Provide either pasted text (content) or a file, not both or neither");
+        }
+
+        if (hasFile) {
+            try {
+                return new String(file.getBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new ValidationError("CAREPLAN_UPLOAD_UNREADABLE", "Could not read the uploaded file");
+            }
+        }
+        return content;
     }
 
     private boolean sameText(String left, String right) {

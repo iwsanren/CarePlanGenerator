@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +68,19 @@ public class OrderController {
             @RequestParam(required = false) String patientName,
             @RequestParam(required = false) String mrn) {
         return ResponseEntity.ok(orderService.searchOrders(patientName, mrn));
+    }
+
+    @PostMapping("/{id}/regenerate")
+    public ResponseEntity<OrderResponse> regenerateCarePlan(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.regenerateCarePlan(id));
+    }
+
+    @PostMapping(value = "/{id}/careplan/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<OrderResponse> uploadCarePlan(
+            @PathVariable Long id,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) MultipartFile file) {
+        return ResponseEntity.ok(orderService.uploadCarePlan(id, content, file));
     }
 
     @GetMapping("/{id}/careplan/download")
