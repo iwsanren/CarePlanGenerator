@@ -74,13 +74,13 @@ public class ReportService {
                 .collect(Collectors.toMap(carePlan -> carePlan.getOrder().getId(), carePlan -> carePlan));
 
         StringBuilder csv = new StringBuilder();
-        appendRow(csv, HEADER);
+        CsvWriter.appendRow(csv, HEADER);
 
         orders.stream()
                 .filter(order -> matches(order, carePlansByOrderId.get(order.getId()), startDate, endDate, status, providerId))
                 .sorted(Comparator.comparing(Order::getCreatedAt, Comparator.reverseOrder())
                         .thenComparing(Order::getId, Comparator.reverseOrder()))
-                .forEach(order -> appendRow(csv, toRow(order, carePlansByOrderId.get(order.getId()))));
+                .forEach(order -> CsvWriter.appendRow(csv, toRow(order, carePlansByOrderId.get(order.getId()))));
 
         String filename = "orders_report_" + FILE_NAME_TIMESTAMP.format(LocalDateTime.now()) + ".csv";
         return new ReportFile(filename, csv.toString().getBytes(StandardCharsets.UTF_8));
@@ -143,19 +143,6 @@ public class ReportService {
         } catch (IllegalArgumentException ex) {
             throw new ValidationError("INVALID_STATUS", "status must be PENDING, PROCESSING, COMPLETED, or FAILED");
         }
-    }
-
-    private void appendRow(StringBuilder csv, List<String> values) {
-        csv.append(values.stream().map(this::escapeCsvCell).collect(Collectors.joining(","))).append("\r\n");
-    }
-
-    private String escapeCsvCell(String value) {
-        String safeValue = value == null ? "" : value;
-        // A spreadsheet can interpret a cell beginning with these characters as a formula.
-        if (!safeValue.isEmpty() && "=+-@".indexOf(safeValue.charAt(0)) >= 0) {
-            safeValue = "'" + safeValue;
-        }
-        return '"' + safeValue.replace("\"", "\"\"") + '"';
     }
 
     private String joinName(String firstName, String lastName) {
