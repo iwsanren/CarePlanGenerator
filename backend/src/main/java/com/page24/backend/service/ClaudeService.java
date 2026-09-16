@@ -68,7 +68,8 @@ public class ClaudeService implements BaseLLMService {
         }
     }
 
-    private String buildPrompt(String patientInfo) {
+    // package-private so RequiredCarePlanSectionsTest can call it directly without a live API key
+    String buildPrompt(String patientInfo) {
         return String.format("""
                 Based on the following patient information, generate a comprehensive care plan.
 
