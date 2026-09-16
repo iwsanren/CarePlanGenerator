@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import com.page24.backend.validation.IdentifierFormats;
+
 /** Partial-update request body for PATCH /api/v1/providers/{id}. */
 @Data
 public class PatchProviderRequest {
@@ -13,7 +15,7 @@ public class PatchProviderRequest {
     @Pattern(regexp = ".*\\S.*", message = "name cannot be blank")
     private String name;
 
-    @Pattern(regexp = "^\\d{10}$", message = "NPI must be exactly 10 digits")
+    @Pattern(regexp = IdentifierFormats.NPI_REGEX, message = "NPI must be exactly 10 digits")
     private String npi;
 
     @Size(max = 20, message = "phone must not exceed 20 characters")

@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.page24.backend.validation.Icd10Codes;
+import com.page24.backend.validation.IdentifierFormats;
 
 /**
  * Day9 Step1:
@@ -18,9 +19,6 @@ import com.page24.backend.validation.Icd10Codes;
  */
 @Data
 public class InternalOrder {
-    // Reusable patterns (can later move to ValidationPatterns class)
-    public static final String NPI_REGEX = "^\\d{10}$";
-    public static final String MRN_REGEX = "^\\d{6}$";
 
     @NotNull(message = "patient is required")
     @Valid
@@ -47,7 +45,7 @@ public class InternalOrder {
         private String lastName;
 
         @NotBlank(message = "patient.mrn is required")
-        @Pattern(regexp = MRN_REGEX, message = "patient.mrn must be exactly 6 digits")
+        @Pattern(regexp = IdentifierFormats.MRN_REGEX, message = "patient.mrn must be exactly 6 digits")
         private String mrn;
 
         @NotNull(message = "patient.dateOfBirth is required")
@@ -60,7 +58,7 @@ public class InternalOrder {
         private String name;
 
         @NotBlank(message = "provider.npi is required")
-        @Pattern(regexp = NPI_REGEX, message = "provider.npi must be exactly 10 digits")
+        @Pattern(regexp = IdentifierFormats.NPI_REGEX, message = "provider.npi must be exactly 10 digits")
         private String npi;
     }
 

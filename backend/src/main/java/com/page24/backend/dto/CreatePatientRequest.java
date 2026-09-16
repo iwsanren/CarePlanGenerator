@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.page24.backend.validation.Icd10Codes;
+import com.page24.backend.validation.IdentifierFormats;
 
 @Data
 public class CreatePatientRequest {
@@ -24,7 +25,7 @@ public class CreatePatientRequest {
     private String lastName;
 
     @NotBlank(message = "mrn is required")
-    @Pattern(regexp = "^\\d{6}$", message = "MRN must be exactly 6 digits")
+    @Pattern(regexp = IdentifierFormats.MRN_REGEX, message = "MRN must be exactly 6 digits")
     private String mrn;
 
     @PastOrPresent(message = "date_of_birth cannot be in the future")

@@ -12,6 +12,7 @@ import lombok.Data;
 import java.time.LocalDate;
 
 import com.page24.backend.validation.Icd10Codes;
+import com.page24.backend.validation.IdentifierFormats;
 
 /**
  * The form data submitted by the user when the frontend creates an order.
@@ -27,7 +28,7 @@ public class CreateOrderRequest {
     private String patientLastName;
 
     @NotBlank(message = "patientMrn is required")
-    @Pattern(regexp = "^\\d{6}$", message = "MRN must be exactly 6 digits")
+    @Pattern(regexp = IdentifierFormats.MRN_REGEX, message = "MRN must be exactly 6 digits")
     private String patientMrn;
 
     private LocalDate patientDateOfBirth;
@@ -36,7 +37,7 @@ public class CreateOrderRequest {
     private String providerName;
 
     @NotBlank(message = "providerNpi is required")
-    @Pattern(regexp = "^\\d{10}$", message = "NPI must be exactly 10 digits")
+    @Pattern(regexp = IdentifierFormats.NPI_REGEX, message = "NPI must be exactly 10 digits")
     private String providerNpi;
 
     @NotBlank(message = "medicationName is required")

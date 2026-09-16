@@ -9,6 +9,7 @@ import com.page24.backend.dto.UpdatePatientRequest;
 import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.service.PatientService;
+import com.page24.backend.validation.IdentifierFormats;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,7 @@ public class PatientController {
 
     @GetMapping("/by-mrn/{mrn}")
     public ResponseEntity<PatientDetailResponse> getPatientByMrn(@PathVariable String mrn) {
-        if (!mrn.matches("\\d{6}")) {
+        if (!mrn.matches(IdentifierFormats.MRN_REGEX)) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(patientService.getPatientByMrn(mrn));

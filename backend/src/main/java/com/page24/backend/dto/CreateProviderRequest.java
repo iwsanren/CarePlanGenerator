@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import com.page24.backend.validation.IdentifierFormats;
+
 @Data
 public class CreateProviderRequest {
 
@@ -12,7 +14,7 @@ public class CreateProviderRequest {
     private String name;
 
     @NotBlank(message = "npi is required")
-    @Pattern(regexp = "^\\d{10}$", message = "NPI must be exactly 10 digits")
+    @Pattern(regexp = IdentifierFormats.NPI_REGEX, message = "NPI must be exactly 10 digits")
     private String npi;
 
     @Size(max = 20, message = "phone must not exceed 20 characters")
