@@ -75,4 +75,33 @@ export const orderService = {
             status: String(response.data.status).toLowerCase() as OrderStatus,
         }
     },
+
+    /** POST /orders/{id}/regenerate — reset a completed/failed care plan and re-run generation. */
+    async regenerateCarePlan(id: number): Promise<OrderResponse> {
+        const response = await api.post<OrderResponse>(`/orders/${id}/regenerate`)
+        return {
+            ...response.data,
+            status: String(response.data.status).toLowerCase() as OrderStatus,
+        }
+    },
+
+    /** POST /orders/{id}/careplan/upload — exactly one of `text` or `file` must be set. */
+    async uploadCarePlan(id: number, upload: { text?: string; file?: File }): Promise<OrderResponse> {
+        const formData = new FormData()
+        if (upload.text) formData.append('content', upload.text)
+        if (upload.file) formData.append('file', upload.file)
+
+        const response = await api.post<OrderResponse>(`/orders/${id}/careplan/upload`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return {
+            ...response.data,
+            status: String(response.data.status).toLowerCase() as OrderStatus,
+        }
+    },
+
+    /** Not routed through axios — this is a direct browser navigation target (file download), not a JSON call. */
+    getCarePlanDownloadUrl(id: number): string {
+        return `/api/v1/orders/${id}/careplan/download`
+    },
 }

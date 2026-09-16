@@ -1,9 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Download, Loader2, RefreshCw, Upload } from 'lucide-react'
 
-import { useOrder, useCarePlanStatus, isNotFoundError } from '@/hooks/useOrders'
+import {
+    useOrder,
+    useCarePlanStatus,
+    useRegenerateCarePlan,
+    useUploadCarePlan,
+    isNotFoundError,
+} from '@/hooks/useOrders'
+import { orderService } from '@/services/orderService'
+import { UploadCarePlanModal } from '@/components/modals/UploadCarePlanModal'
+import { Button } from '@/components/ui/Button'
 import { cn, getStatusColor } from '@/utils/utils'
 import type { OrderResponse } from '@/types'
 
@@ -65,9 +74,15 @@ function NotFoundCard() {
 function CarePlanSection({
     order,
     statusPreview,
+    onRegenerate,
+    onOpenUpload,
+    regenerating,
 }: {
     order: OrderResponse
     statusPreview?: string
+    onRegenerate: () => void
+    onOpenUpload: () => void
+    regenerating: boolean
 }) {
     switch (order.status) {
         case 'pending':
@@ -89,20 +104,54 @@ function CarePlanSection({
                 </div>
             )
         case 'completed':
-            return order.carePlanContent ? (
-                <pre className="whitespace-pre-wrap break-words rounded bg-gray-50 p-4 text-sm font-mono">
-                    {order.carePlanContent}
-                </pre>
-            ) : (
-                <p className="text-sm text-gray-500">
-                    Marked complete, but no content was returned.
-                </p>
+            return (
+                <div className="space-y-4">
+                    {order.carePlanContent ? (
+                        <pre className="whitespace-pre-wrap break-words rounded bg-gray-50 p-4 text-sm font-mono">
+                            {order.carePlanContent}
+                        </pre>
+                    ) : (
+                        <p className="text-sm text-gray-500">
+                            Marked complete, but no content was returned.
+                        </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(orderService.getCarePlanDownloadUrl(order.id), '_blank')}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            {regenerating ? 'Regenerating…' : 'Regenerate'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={onOpenUpload}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload New
+                        </Button>
+                    </div>
+                </div>
             )
         case 'failed':
             return (
-                <p className="text-sm text-red-600">
-                    {order.message ?? 'Care plan generation failed.'}
-                </p>
+                <div className="space-y-4">
+                    <p className="text-sm text-red-600">
+                        {order.message ?? 'Care plan generation failed.'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            {regenerating ? 'Retrying…' : 'Retry'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={onOpenUpload}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Manual
+                        </Button>
+                    </div>
+                </div>
             )
         default:
             // status was something outside the known union — render nothing rather than crash.
@@ -125,6 +174,9 @@ export function OrderDetailPage() {
     // React requires hooks to be called in the same order on every render.
     const { data, isLoading, isError, error } = useOrder(id)
     const { data: statusData } = useCarePlanStatus(id)
+    const regenerateCarePlan = useRegenerateCarePlan()
+    const uploadCarePlan = useUploadCarePlan()
+    const [uploadModalOpen, setUploadModalOpen] = useState(false)
 
     // Once polling reports a terminal state, refetch the full order so
     // carePlanContent (only present on GET /orders/{id}, not on the status
@@ -213,7 +265,13 @@ export function OrderDetailPage() {
 
             {/* Card B: Care Plan */}
             <Card title="Care Plan">
-                <CarePlanSection order={order} statusPreview={statusData?.carePlanPreview} />
+                <CarePlanSection
+                    order={order}
+                    statusPreview={statusData?.carePlanPreview}
+                    onRegenerate={() => regenerateCarePlan.mutate(order.id)}
+                    onOpenUpload={() => setUploadModalOpen(true)}
+                    regenerating={regenerateCarePlan.isPending}
+                />
             </Card>
 
             {/* Card C: References — placeholder until patient / provider endpoints are wired */}
@@ -227,6 +285,18 @@ export function OrderDetailPage() {
                     Patient #{order.patientId} · Provider #{order.providerId}
                 </p>
             </Card>
+
+            <UploadCarePlanModal
+                open={uploadModalOpen}
+                submitting={uploadCarePlan.isPending}
+                onClose={() => setUploadModalOpen(false)}
+                onSubmit={(upload) =>
+                    uploadCarePlan.mutate(
+                        { id: order.id, upload },
+                        { onSuccess: () => setUploadModalOpen(false) },
+                    )
+                }
+            />
         </div>
     )
 }

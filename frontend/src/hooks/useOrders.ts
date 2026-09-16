@@ -105,3 +105,28 @@ export function useCarePlanStatus(id: number) {
         },
     })
 }
+
+/** useMutation for POST /orders/{id}/regenerate — invalidates the order + status caches on success. */
+export function useRegenerateCarePlan() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (id: number) => orderService.regenerateCarePlan(id),
+        onSuccess: (_data, id) => {
+            queryClient.invalidateQueries({ queryKey: ['order', id] })
+            queryClient.invalidateQueries({ queryKey: ['carePlanStatus', id] })
+        },
+    })
+}
+
+/** useMutation for POST /orders/{id}/careplan/upload — invalidates the order + status caches on success. */
+export function useUploadCarePlan() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, upload }: { id: number; upload: { text?: string; file?: File } }) =>
+            orderService.uploadCarePlan(id, upload),
+        onSuccess: (_data, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ['order', id] })
+            queryClient.invalidateQueries({ queryKey: ['carePlanStatus', id] })
+        },
+    })
+}
