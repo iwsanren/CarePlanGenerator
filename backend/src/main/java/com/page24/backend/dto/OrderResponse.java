@@ -2,6 +2,7 @@ package com.page24.backend.dto;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -13,6 +14,12 @@ public class OrderResponse {
     private Long id;
     private Long patientId;
     private Long providerId;
+    private String patientFirstName;
+    private String patientLastName;
+    private String patientMrn;
+    private LocalDate patientDateOfBirth;
+    private String providerName;
+    private String providerNpi;
     private String medicationName;
     private String status;
     private String carePlanContent;

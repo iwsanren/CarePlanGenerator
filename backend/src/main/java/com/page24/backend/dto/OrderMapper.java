@@ -31,6 +31,12 @@ public class OrderMapper {
         response.setId(order.getId());
         response.setPatientId(order.getPatient().getId());
         response.setProviderId(order.getProvider().getId());
+        response.setPatientFirstName(order.getPatient().getFirstName());
+        response.setPatientLastName(order.getPatient().getLastName());
+        response.setPatientMrn(order.getPatient().getMrn());
+        response.setPatientDateOfBirth(order.getPatient().getDateOfBirth());
+        response.setProviderName(order.getProvider().getName());
+        response.setProviderNpi(order.getProvider().getNpi());
         response.setMedicationName(order.getMedicationName());
         response.setResultType("SUCCESS");
         response.setRequiresConfirm(false);
@@ -59,9 +65,12 @@ public class OrderMapper {
         return new OrderListItemResponse(
                 order.getId(),
                 patientName,
+                order.getPatient().getMrn(),
                 order.getMedicationName(),
                 status,
-                order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant()
+                order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant(),
+                order.getProvider().getName(),
+                order.getProvider().getNpi()
         );
     }
 }

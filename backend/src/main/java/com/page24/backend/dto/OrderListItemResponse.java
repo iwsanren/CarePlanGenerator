@@ -13,9 +13,15 @@ public class OrderListItemResponse {
 
     private String patientName;
 
+    private String patientMrn;
+
     private String medicationName;
 
     private String status;
 
     private Instant createdAt;
+
+    private String providerName;
+
+    private String providerNpi;
 }

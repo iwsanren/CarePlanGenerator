@@ -145,9 +145,9 @@ export function OrdersPage() {
                                         >
                                             {order.patientName}
                                         </Link>
-                                        <p className="text-sm text-gray-500">MRN: —</p>
+                                        <p className="text-sm text-gray-500">MRN: {order.patientMrn}</p>
                                     </td>
-                                    <td className="px-6 py-4 text-gray-400">—</td>
+                                    <td className="px-6 py-4 text-gray-400">{order.providerName}</td>
                                     <td className="px-6 py-4">{order.medicationName}</td>
                                     <td className="px-6 py-4">
                       <span

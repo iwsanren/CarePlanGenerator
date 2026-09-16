@@ -274,16 +274,17 @@ export function OrderDetailPage() {
                 />
             </Card>
 
-            {/* Card C: References — placeholder until patient / provider endpoints are wired */}
-            <Card title="References">
-                {/*
-                    TODO(later): render full Patient / Provider cards once GET /patients/{id}
-                    and GET /providers/by-id/{id} are reconciled. This page currently only
-                    consumes GET /orders/{id}, which exposes ids but not nested objects.
-                */}
-                <p className="text-sm text-gray-400">
-                    Patient #{order.patientId} · Provider #{order.providerId}
-                </p>
+            {/* Card C: Patient */}
+            <Card title="Patient">
+                <Field label="Name" value={`${order.patientFirstName} ${order.patientLastName}`} />
+                <Field label="MRN" value={order.patientMrn} />
+                <Field label="DOB" value={order.patientDateOfBirth ?? 'Not provided'} />
+            </Card>
+
+            {/* Card D: Provider */}
+            <Card title="Provider">
+                <Field label="Name" value={order.providerName} />
+                <Field label="NPI" value={order.providerNpi} />
             </Card>
 
             <UploadCarePlanModal

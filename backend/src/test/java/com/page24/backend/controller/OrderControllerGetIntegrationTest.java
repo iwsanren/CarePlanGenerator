@@ -147,9 +147,12 @@ class OrderControllerGetIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.results[0].patientName").value("Alice Wong"))
+                .andExpect(jsonPath("$.results[0].patientMrn").value("100001"))
                 .andExpect(jsonPath("$.results[0].medicationName").value("IVIG"))
                 .andExpect(jsonPath("$.results[0].status").value("pending"))
-                .andExpect(jsonPath("$.results[0].createdAt").exists());
+                .andExpect(jsonPath("$.results[0].createdAt").exists())
+                .andExpect(jsonPath("$.results[0].providerName").value("Dr. Green"))
+                .andExpect(jsonPath("$.results[0].providerNpi").value("1111111111"));
     }
 
     @Test

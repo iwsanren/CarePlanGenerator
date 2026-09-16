@@ -58,6 +58,12 @@ export interface OrderResponse {
     id: number
     patientId: number
     providerId: number
+    patientFirstName: string
+    patientLastName: string
+    patientMrn: string
+    patientDateOfBirth?: string
+    providerName: string
+    providerNpi: string
     medicationName: string
     status: OrderStatus
     carePlanContent?: string | null   // Present only when status === 'completed'
@@ -71,9 +77,12 @@ export interface OrderResponse {
 export interface OrderListItem {
     id: number
     patientName: string
+    patientMrn: string
     medicationName: string
     status: OrderStatus
     createdAt: string                 // ISO-8601 UTC, e.g. "2026-08-30T12:34:56Z"
+    providerName: string
+    providerNpi: string
 }
 
 /** Paginated response for GET /orders: page-based pagination (page + pageSize), not next/previous URLs */

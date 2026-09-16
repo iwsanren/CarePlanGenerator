@@ -68,7 +68,13 @@ class OrderControllerPostIntegrationTest {
                         .content(validRequestJson("IVIG", false)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resultType").value("SUCCESS"))
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.patientFirstName").value("Alice"))
+                .andExpect(jsonPath("$.patientLastName").value("Wong"))
+                .andExpect(jsonPath("$.patientMrn").value("123456"))
+                .andExpect(jsonPath("$.patientDateOfBirth").value("1990-05-10"))
+                .andExpect(jsonPath("$.providerName").value("Dr. Green"))
+                .andExpect(jsonPath("$.providerNpi").value("1111111111"));
     }
 
     @Test
