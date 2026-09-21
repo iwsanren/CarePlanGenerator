@@ -15,7 +15,8 @@ notes/
 AGENTS.md
 
 # docs
-docs/
+docs/*
+!docs/screenshots/
 
 reference/
 

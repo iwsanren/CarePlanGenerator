@@ -12,6 +12,20 @@ A full-stack web application for specialty pharmacies to automatically generate 
 
 This implementation is built as a guided, day-by-day learning project: a Java/Spring Boot + React port of a Python/Django reference implementation, built up from a synchronous MVP to an async, queue-backed, monitored, cloud-deployable app. See [Current Status](#current-status) for what stage it's at.
 
+## Screenshots
+
+**Orders list** — patients, providers, medications, and care plan status at a glance, including every state (`completed`, `pending`, `processing`, `failed`):
+
+![Orders list](docs/screenshots/orders-list.png)
+
+**New order form** — patient, provider, and order details in one submission:
+
+![New order form](docs/screenshots/new-order-form.png)
+
+**Order detail** — the generated care plan alongside patient/provider info and download/regenerate/upload actions:
+
+![Order detail](docs/screenshots/order-detail.png)
+
 ## Current Status
 
 Implemented pieces:
@@ -385,7 +399,7 @@ See `backend/.env.example` for a starting point. Values below are read by `appli
 
 **Data Flow:**
 1. Spring Boot API saves the order to PostgreSQL, then pushes the new CarePlan's id onto Redis
-2. `CarePlanWorker` polls Redis every 5 seconds for a queued id
+2. `CarePlanWorker` picks it up almost immediately via an event listener fired after the enqueueing transaction commits; a `@Scheduled(fixedDelay = 30000)` poll is a 30-second backstop in case an event is ever missed (e.g. app restart with leftover queued ids)
 3. The worker reads the order from PostgreSQL
 4. The worker calls the configured LLM provider, with retry + exponential backoff on failure
 5. The worker writes the generated care plan back to PostgreSQL
