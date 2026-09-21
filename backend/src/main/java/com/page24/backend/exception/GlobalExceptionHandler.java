@@ -2,6 +2,7 @@ package com.page24.backend.exception;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(CarePlanNotReadyException.class)
@@ -82,11 +84,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpectedException(Exception ex) {
+        log.error("Unexpected server error", ex);
         ApiErrorResponse body = new ApiErrorResponse(
                 "error",
                 "INTERNAL_SERVER_ERROR",
                 "Unexpected server error",
-                Map.of("exception", ex.getClass().getSimpleName()),
+                null,
                 HttpStatus.INTERNAL_SERVER_ERROR.value()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
