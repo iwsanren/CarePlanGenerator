@@ -2,6 +2,8 @@
 
 A full-stack web application for specialty pharmacies to automatically generate care plans using LLM technology.
 
+The Docker/Spring MVC application now uses **Keycloak + Spring Security JWT authentication** with assistant/pharmacist permissions. See the [Chinese/English interview guide](notes/authentication-interview.md) and [verification evidence](notes/authentication-verification.md). The AWS Lambda training path has **not** received this authentication implementation.
+
 ## Background
 
 **Customer:** A specialty pharmacy
@@ -13,6 +15,33 @@ A full-stack web application for specialty pharmacies to automatically generate 
 This implementation is built as a guided, day-by-day learning project: a Java/Spring Boot + React port of a Python/Django reference implementation, built up from a synchronous MVP to an async, queue-backed, monitored, cloud-deployable app. See [Current Status](#current-status) for what stage it's at.
 
 ## Screenshots
+
+### Employee sign-in
+
+**Application sign-in gate** — employees sign in before accessing orders and patient data:
+
+![Application sign-in gate](docs/screenshots/auth-sign-in.png)
+
+**Keycloak login** — the `careplan` realm provides the login page for the Authorization Code + PKCE flow. Employee accounts are created by an administrator; public registration is disabled:
+
+![Keycloak employee login](docs/screenshots/auth-keycloak-login.png)
+
+<details>
+<summary>View assistant and pharmacist permissions</summary>
+
+**Assistant view** — a completed care plan can be downloaded; regeneration and replacement controls are hidden:
+
+![Assistant care plan view](docs/screenshots/auth-assistant.png)
+
+**Pharmacist view** — the same shared order also offers **Regenerate** and **Upload New**:
+
+![Pharmacist care plan view](docs/screenshots/auth-pharmacist.png)
+
+These screenshots show role-based UI controls. Spring Security independently enforces the corresponding API permissions. The displayed patient and provider records are synthetic demo data.
+
+</details>
+
+### Order workflow
 
 **Orders list** — patients, providers, medications, and care plan status at a glance, including every state (`completed`, `pending`, `processing`, `failed`):
 
@@ -41,7 +70,9 @@ Implemented pieces:
 - CSV export/reporting endpoints
 - Standalone Patient/Provider CRUD APIs
 - Unit and integration tests
-- Prometheus and Grafana local monitoring setup (backend-only compose file)
+- Keycloak login (Authorization Code + PKCE S256), JWT validation and employee role authorization
+- Operator audit records for creation, regeneration, uploads, downloads, exports and restricted deletes
+- Prometheus and Grafana monitoring through an authenticated root Compose overlay
 - AWS Lambda / SQS handler and packaging practice code, plus Terraform practice stacks
 
 ## Features
@@ -59,6 +90,7 @@ Implemented pieces:
 | Component | Technology |
 |-----------|------------|
 | Backend | Spring Boot 4.0, Spring Web MVC, Spring Data JPA |
+| Authentication | Keycloak 26.4.0, Spring Security OAuth2 Resource Server, JWT |
 | Database | PostgreSQL 15 |
 | Task Queue | Redis 7 + Spring `@Scheduled` worker (`CarePlanWorker`) |
 | LLM | OpenAI / Anthropic Claude / local mock (configurable) |
@@ -69,7 +101,7 @@ Implemented pieces:
 
 ### Prerequisites
 
-- Docker & Docker Compose
+- Docker & Docker Compose 2.24+ (Linux containers)
 
 ### Setup
 
@@ -78,17 +110,21 @@ Implemented pieces:
 git clone <repo-url>
 cd CarePlanGenerator
 
-# 2. Copy environment file and configure API keys
+# 2. Optional: override local demo settings and LLM configuration
+cp .env.example .env
 cp backend/.env.example backend/.env
 # Edit backend/.env with your LLM_API_KEY (OpenAI) or CLAUDE_API_KEY
 # Not required for local development: LLM_MOCK_ENABLED=true is the default,
 # so the app runs end-to-end with a local mock LLM out of the box.
 
-# 3. Start all services (postgres, redis, backend, frontend)
-docker compose up --build
+# 3. Start PostgreSQL, Redis, Keycloak + its database, Spring Boot and React
+docker compose up --build -d
+docker compose ps
 ```
 
 All services will be running via Docker. On first startup, the backend inserts mock data automatically (skipped if the database already has data — there is no separate seed command to run).
+
+In PowerShell use `Copy-Item .env.example .env` and `Copy-Item backend/.env.example backend/.env`. Both env files are optional for the default local mock demo. Use `localhost` consistently; `127.0.0.1` is a different origin. Compose waits for Keycloak's health before starting the backend, and backend health before starting React.
 
 ### Access the App
 
@@ -97,6 +133,42 @@ All services will be running via Docker. On first startup, the backend inserts m
 | Frontend | http://localhost:3000 |
 | API | http://localhost:8080/api/v1/ |
 | Actuator health | http://localhost:8080/actuator/health |
+| Keycloak admin | http://localhost:8081/admin/ |
+
+### Local demo accounts and authentication
+
+These defaults are **local development only**. Supply independent credentials through environment variables for another environment.
+
+| Account | Password | Purpose |
+|---|---|---|
+| `assistant` | `AssistantDemo123!` | `careplan-api` client role `ASSISTANT` |
+| `pharmacist` | `PharmacistDemo123!` | `careplan-api` client role `PHARMACIST` |
+| `admin` | `local-admin-only` | Keycloak administration in the master realm; no application staff role |
+
+Click **Sign in** and use Keycloak's login page. Public registration and the frontend password grant are disabled. Administrators create employees in realm `careplan` and assign a **client role from `careplan-api`**. The public SPA client is `careplan-web`; it contains no client secret. Both employee roles share the pharmacy's existing records.
+
+All `/api/v1/**` endpoints require a valid employee access token. Assistants can view/create/update basic records and download completed plans. Pharmacists additionally regenerate/upload plans, use both export endpoints and delete patients/providers (subject to existing business constraints). Frontend visibility is supplemented by independent backend URL and service checks. A verified account with no staff role receives 403.
+
+Realm import is versioned in `keycloak/careplan-realm.json`; passwords are environment placeholders. Import runs only when the realm is absent. Updating `.env` does **not** reset users/passwords in an existing Keycloak database: change them through the admin console. Existing pharmacy data is preserved and legacy orders are labeled `legacy` in the audit subject columns. Do not remove database volumes to apply authentication changes.
+
+For direct API tools, send `Authorization: Bearer <access_token>` with an access token from the browser's Authorization Code login. Do not put tokens in URLs or use the ID token for API calls. Downloads/exports in React use authenticated Axios blob requests.
+
+Root `.env` configures the public Keycloak URL, demo/admin/Keycloak DB credentials, pharmacy DB password, CORS and monitoring credentials. `backend/.env` configures optional LLM settings. Changing the public URL also requires updating the SPA redirect/logout URIs and web origins in Keycloak. The guide explains the separate public issuer and internal Docker JWKS URL. PostgreSQL initialization passwords also apply only to a new database; rotate existing DB credentials deliberately.
+
+### Reproduce authentication verification
+
+Use Java 17+ and Node.js 18+ for host tests:
+
+```powershell
+cd backend
+.\mvnw.cmd '-Dspring.profiles.active=test' clean test
+cd ..\frontend
+npm.cmd ci
+npm.cmd run build
+npm.cmd run test:e2e
+```
+
+The browser tests require the running root Compose stack and Microsoft Edge (default). For Chrome set `$env:PLAYWRIGHT_CHANNEL='chrome'`; alternatively install Playwright Chromium and set `chromium`. For custom demo/admin passwords export the corresponding variables in the test shell as well; Playwright does not automatically load the root `.env`. The E2E suite creates synthetic orders and a temporary roleless Keycloak account, deletes only that temporary account, and preserves orders for inspection. Detailed scope and evidence are in [verification](notes/authentication-verification.md).
 
 ## Input Fields
 
@@ -295,13 +367,7 @@ Windows PowerShell:
 .\mvnw.cmd test
 ```
 
-Run tests inside Docker, using the [backend-only compose file](#backend-only-setup-with-monitoring):
-
-```bash
-docker compose run --rm backend-test
-```
-
-Tests use an H2 in-memory database and `LLM_MOCK_ENABLED=true`, so they do not require a real LLM API.
+Tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests. See [verification](notes/authentication-verification.md) for the commands, cryptographic tests and browser tests.
 
 ## Common Commands
 
@@ -327,7 +393,7 @@ docker ps -a
 
 ### Port Conflicts
 
-This project uses ports 3000 (frontend), 8080 (backend), 5432 (Postgres), and 6379 (Redis). If you get a "port already in use" error:
+This project uses ports 3000 (frontend), 8080 (backend), 8081 (Keycloak), 5432 (Postgres), and 6379 (Redis). Optional monitoring uses 9090 and 3001. If you get a "port already in use" error:
 
 Mac/Linux:
 
@@ -366,7 +432,7 @@ docker compose restart backend
 
 ## Environment Variables
 
-See `backend/.env.example` for a starting point. Values below are read by `application.properties`; when running via the root `docker-compose.yml`, the datasource and Redis variables are already fixed by the compose file itself, so only the `LLM_*` variables are yours to set.
+See the root `.env.example` for authentication, database and monitoring overrides, and `backend/.env.example` for optional LLM/host-run settings. Root Compose sets the internal datasource, Redis and JWKS addresses explicitly; the browser-facing issuer remains the public Keycloak URL.
 
 | Variable | Description |
 |----------|-------------|
@@ -407,6 +473,7 @@ See `backend/.env.example` for a starting point. Values below are read by `appli
 ## Workflow
 
 1. Medical assistant fills out the web form with patient/order data
+   after signing in through Keycloak with Authorization Code + PKCE.
 2. Frontend validates input (MRN 6 digits, NPI 10 digits, etc.)
 3. API checks for duplicate patients, providers, and orders
    - If warning → user can acknowledge (`confirm=true`) and continue
@@ -416,7 +483,7 @@ See `backend/.env.example` for a starting point. Values below are read by `appli
 6. Worker calls the LLM to generate the care plan
 7. Care plan is saved to the database
 8. Frontend polls `GET /api/v1/orders/{id}/status` and renders the result once `COMPLETED`
-9. User can download the care plan as a text file, or regenerate/replace it
+9. Employees can download the care plan; pharmacists can additionally regenerate/replace it
 
 ## Project Structure
 
@@ -454,14 +521,14 @@ Important entry points:
 - Care plan generation: `backend/src/main/java/com/page24/backend/service/CarePlanGenerationService.java`
 - Frontend entry: `frontend/src/main.tsx`
 
-## Backend-only setup with monitoring
+## Authenticated monitoring setup
 
-`backend/docker-compose.yml` is a separate, backend-only compose file for working on the API in isolation and viewing Prometheus/Grafana metrics. It does not start the frontend, and it additionally starts a `backend-test` service and Prometheus/Grafana. Because Grafana also binds port 3000, don't run this alongside the root `docker-compose.yml`.
+Use the root stack and its monitoring overlay. The old `backend/docker-compose.yml` remains a legacy training file: it does not include Keycloak or the new monitoring credential mounts and is outside this delivery's supported startup path. Do not run both stacks together.
 
-From the `backend/` directory:
+From the repository root:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build -d
 ```
 
 Available URLs:
@@ -469,7 +536,9 @@ Available URLs:
 - Backend API: http://localhost:8080/api/v1/orders
 - Actuator health: http://localhost:8080/actuator/health
 - Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000
+- Grafana: http://localhost:3001
+
+Prometheus receives `METRICS_USER` and `METRICS_PASSWORD` as mounted configuration files generated from Compose environment values. These credentials grant access only to `/actuator/prometheus`, not to business APIs. Missing/wrong credentials return 401. Basic health is public and hides details; other management endpoints are denied. Grafana still uses its local image defaults on an empty volume; provision production credentials/dashboard access separately.
 
 ## Observability
 
@@ -478,7 +547,7 @@ Available URLs:
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Prometheus | http://localhost:9090 | Metrics storage & queries |
-| Grafana | http://localhost:3000 | Dashboards & visualization (default admin/admin; no pre-built dashboard — add Prometheus as a data source and build panels) |
+| Grafana | http://localhost:3001 | Dashboards & visualization (local default admin/admin; no pre-built dashboard — add Prometheus as a data source and build panels) |
 
 Spring Boot Actuator exposes Micrometer's default metrics at:
 
