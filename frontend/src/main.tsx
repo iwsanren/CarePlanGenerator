@@ -8,7 +8,7 @@ import './index.css'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (count, error) => ![401, 403].includes((error as { status?: number }).status || 0) && count < 1,
       refetchOnWindowFocus: false,
     },
   },

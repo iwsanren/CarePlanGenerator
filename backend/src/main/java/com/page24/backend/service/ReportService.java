@@ -8,6 +8,8 @@ import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.page24.backend.security.Audited;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
  * be added later without changing the HTTP endpoint.
  */
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 public class ReportService {
 
@@ -50,7 +53,9 @@ public class ReportService {
     private final OrderRepository orderRepository;
     private final CarePlanRepository carePlanRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("FILTERED_EXPORT")
     public ReportFile exportOrders(
             String format,
             String startDateValue,

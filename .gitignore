@@ -16,9 +16,17 @@ AGENTS.md
 
 # docs
 docs/*
+!notes/authentication-interview.md
+!notes/authentication-verification.md
 !docs/screenshots/
 
 reference/
 
 # logs
 **/logs
+# Generated auth verification artifacts
+auth-compose.log
+backend/auth-test.log
+frontend/test-results/
+frontend/playwright-report/
+.env

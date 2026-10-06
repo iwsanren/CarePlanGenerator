@@ -1,3 +1,5 @@
+# Legacy training stack: does not include Keycloak. For the authenticated app use
+# ../docker-compose.yml with ../docker-compose.monitoring.yml from the repository root.
 version: '3.8'
 
 services:

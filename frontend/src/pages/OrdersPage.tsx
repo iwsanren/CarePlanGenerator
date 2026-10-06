@@ -1,3 +1,5 @@
+import { useAuth } from '@/auth/auth'
+import { downloadFile } from '@/services/download'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Download, FileText, Loader2 } from 'lucide-react'
@@ -52,6 +54,12 @@ function TableSkeleton() {
 }
 
 export function OrdersPage() {
+    const auth = useAuth()
+    const [exportError, setExportError] = useState<string>()
+    const exportCsv = async () => {
+        try { await downloadFile('/export', 'orders.csv') }
+        catch (error) { setExportError((error as Error).message || 'Export failed. Please try again.') }
+    }
     // page is local component state. setPage(n) tells React to re-render this component with the new value.
     const [page, setPage] = useState(1)
 
@@ -74,20 +82,18 @@ export function OrdersPage() {
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Orders</h1>
                 <div className="flex gap-3">
-                    <Button
+                    {auth.pharmacist && <Button
                         variant="outline"
-                        onClick={() =>
-                            // Full, unfiltered export including care plan content — see backend ExportController.
-                            window.open('/api/v1/export', '_blank')
-                        }
+                        onClick={() => { void exportCsv() }}
                     >
                         <Download className="mr-2 h-4 w-4" />
                         Export CSV
-                    </Button>
+                    </Button>}
                     <Button onClick={() => navigate('/')}>New Order</Button>
                 </div>
             </div>
 
+            {exportError && <p role="alert" className="text-red-600">{exportError}</p>}
             {/* Four states: read this from top to bottom as if / else-if / else */}
             {isLoading ? (
                 // 1. First load, with no data available yet

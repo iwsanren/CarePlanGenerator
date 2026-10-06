@@ -1,3 +1,4 @@
+import { signOut, useAuth } from '@/auth/auth'
 import { Link, useLocation } from 'react-router-dom'
 import { FileText, List, Plus } from 'lucide-react'
 import { cn } from '@/utils/utils'
@@ -8,6 +9,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const auth = useAuth()
 
   const navItems = [
     { path: '/', label: 'New Order', icon: Plus },
@@ -26,7 +28,9 @@ export function Layout({ children }: LayoutProps) {
                 Care Plan Generator
               </h1>
             </div>
-            <nav className="flex gap-4">
+            <nav className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">{auth.username} · {auth.pharmacist ? 'Pharmacist' : 'Assistant'}</span>
+              <button className="text-sm text-blue-600" onClick={() => { void signOut() }}>Sign out</button>
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname === item.path

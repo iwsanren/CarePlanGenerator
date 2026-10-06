@@ -1,4 +1,5 @@
 import api from '@/services/api'
+import { downloadFile } from './download'
 import type {
     ApiError,
     ApiErrorBody,
@@ -100,8 +101,7 @@ export const orderService = {
         }
     },
 
-    /** Not routed through axios — this is a direct browser navigation target (file download), not a JSON call. */
-    getCarePlanDownloadUrl(id: number): string {
-        return `/api/v1/orders/${id}/careplan/download`
+    async downloadCarePlan(id: number) {
+        await downloadFile(`/orders/${id}/careplan/download`, `careplan-${id}.txt`)
     },
 }

@@ -14,6 +14,7 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Set;
@@ -23,6 +24,7 @@ import java.util.Set;
  * then reuse the existing OrderService business pipeline.
  */
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 public class IntakeService {
 

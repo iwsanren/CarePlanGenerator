@@ -20,11 +20,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.page24.backend.security.Audited;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 public class ProviderService {
 
@@ -149,6 +152,8 @@ public class ProviderService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("PROVIDER_DELETED")
     public void deleteProvider(Long id) {
         Provider provider = providerRepository.findById(id)
                 .orElseThrow(ProviderNotFoundException::new);

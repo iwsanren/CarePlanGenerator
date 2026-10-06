@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.springframework.security.test.context.support.WithMockUser(username = "test-pharmacist", roles = "PHARMACIST")
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")

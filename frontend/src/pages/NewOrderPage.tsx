@@ -83,8 +83,7 @@ export function NewOrderPage() {
                 setPendingSubmission(payload) // remember it -- see the closure note in Section 3
                 setPendingWarnings(err.detail.warnings)
             }
-            // any other error type: falls through silently for now; a generic
-            // inline error banner can be added later if it turns out to matter
+            // Other errors are shown by the inline mutation error banner.
         }
     }
 
@@ -112,6 +111,10 @@ export function NewOrderPage() {
         <>
             <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-8">
                 <h1 className="text-2xl font-bold">New Order</h1>
+                {createOrder.error && !isBlockedError(createOrder.error)
+                    && !isConfirmationRequiredError(createOrder.error) && <p role="alert" className="text-red-700">
+                    {createOrder.error.message}
+                </p>}
 
                 {/* ---------- Patient Information ---------- */}
                 <section className="space-y-4 rounded-lg bg-white p-6 shadow">

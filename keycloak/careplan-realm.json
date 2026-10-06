@@ -1,0 +1,115 @@
+{
+  "realm": "careplan",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "roles": {
+    "client": {
+      "careplan-api": [
+        {
+          "name": "ASSISTANT"
+        },
+        {
+          "name": "PHARMACIST"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "careplan-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "careplan-web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "careplan-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "careplan-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "careplan-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "careplan-api",
+            "claim.name": "resource_access.careplan-api.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "assistant",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "assistant@careplan.local",
+      "firstName": "Assistant",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CAREPLAN_ASSISTANT_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "careplan-api": [
+          "ASSISTANT"
+        ]
+      }
+    },
+    {
+      "username": "pharmacist",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "pharmacist@careplan.local",
+      "firstName": "Pharmacist",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CAREPLAN_PHARMACIST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "careplan-api": [
+          "PHARMACIST"
+        ]
+      }
+    }
+  ]
+}

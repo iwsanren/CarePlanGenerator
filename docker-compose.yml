@@ -1,11 +1,53 @@
 services:
+  keycloak-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-local-keycloak-db-only}
+    volumes:
+      - keycloak_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-local-keycloak-db-only}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-local-admin-only}
+      CAREPLAN_ASSISTANT_PASSWORD: ${CAREPLAN_ASSISTANT_PASSWORD:-AssistantDemo123!}
+      CAREPLAN_PHARMACIST_PASSWORD: ${CAREPLAN_PHARMACIST_PASSWORD:-PharmacistDemo123!}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/careplan-realm.json:/opt/keycloak/data/import/careplan-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/9000; printf \"GET /health/ready HTTP/1.0\\r\\n\\r\\n\" >&3; grep -q UP <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   postgres:
     image: postgres:15-alpine
     container_name: careplan-postgres
     environment:
       POSTGRES_DB: careplan
       POSTGRES_USER: careplan_user
-      POSTGRES_PASSWORD: careplan_password
+      POSTGRES_PASSWORD: ${CAREPLAN_DB_PASSWORD:-careplan_password}
     ports:
       - "5432:5432"
     volumes:
@@ -33,20 +75,34 @@ services:
       dockerfile: Dockerfile
     container_name: careplan-backend
     depends_on:
+      keycloak:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}/realms/careplan
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/careplan/protocol/openid-connect/certs
+      METRICS_USER: ${METRICS_USER:-monitor}
+      METRICS_PASSWORD: ${METRICS_PASSWORD:-local-monitor-only}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/careplan
       SPRING_DATASOURCE_USERNAME: careplan_user
-      SPRING_DATASOURCE_PASSWORD: careplan_password
+      SPRING_DATASOURCE_PASSWORD: ${CAREPLAN_DB_PASSWORD:-careplan_password}
+      CAREPLAN_ALLOWED_ORIGINS: ${CAREPLAN_ALLOWED_ORIGINS:-http://localhost:3000}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
     restart: unless-stopped
 
   frontend:
@@ -55,19 +111,20 @@ services:
       dockerfile: Dockerfile
     container_name: careplan-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       # Container-to-container hostname, not localhost -- see vite.config.ts
       VITE_BACKEND_URL: http://backend:8080
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
     ports:
       - "3000:3000"
     volumes:
-      # Bind-mount source for hot reload; anonymous volume keeps the
-      # container's own node_modules (built for linux) from being
-      # shadowed by the host's (which may hold windows/mac binaries)
-      - ./frontend:/app
-      - /app/node_modules
+      # Hot reload only source; dependencies always come from the rebuilt image.
+      - ./frontend/src:/app/src
     restart: unless-stopped
 
 volumes:
+  keycloak_data:
   postgres_data:

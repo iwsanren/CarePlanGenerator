@@ -11,6 +11,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Docker Desktop on Windows can miss bind-mount file system notifications.
+    watch: { usePolling: process.env.CHOKIDAR_USEPOLLING === 'true' },
     proxy: {
       '/api': {
         // Overridden to the "backend" service name when run via docker-compose,

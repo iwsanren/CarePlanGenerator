@@ -7,6 +7,8 @@ import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.page24.backend.security.Audited;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
  * instead matches the reference implementation's dedicated GET /export/.
  */
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 public class ExportService {
 
@@ -51,7 +54,9 @@ public class ExportService {
     private final OrderRepository orderRepository;
     private final CarePlanRepository carePlanRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("FULL_EXPORT")
     public ReportFile exportAll() {
         List<Order> orders = orderRepository.findAll();
         Map<Long, CarePlan> carePlansByOrderId = carePlanRepository.findByOrderIn(orders).stream()

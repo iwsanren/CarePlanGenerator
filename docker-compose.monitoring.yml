@@ -1,0 +1,27 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./backend/src/main/resources/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    configs:
+      - source: metrics_user
+        target: /etc/prometheus/metrics-user
+      - source: metrics_password
+        target: /etc/prometheus/metrics-password
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+  grafana:
+    image: grafana/grafana:12.1.1
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+volumes:
+  grafana_data:
+configs:
+  metrics_user:
+    content: ${METRICS_USER:-monitor}
+  metrics_password:
+    content: ${METRICS_PASSWORD:-local-monitor-only}

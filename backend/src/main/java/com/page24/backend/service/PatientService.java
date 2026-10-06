@@ -28,6 +28,8 @@ import com.page24.backend.repository.PatientDiagnosisRepository;
 import com.page24.backend.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.page24.backend.security.Audited;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +42,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 public class PatientService {
 
@@ -157,6 +160,8 @@ public class PatientService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("PATIENT_DELETED")
     public void deletePatient(Long id) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(PatientNotFoundException::new);

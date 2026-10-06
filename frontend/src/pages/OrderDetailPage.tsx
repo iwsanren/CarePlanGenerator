@@ -1,3 +1,4 @@
+import { useAuth } from '@/auth/auth'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -84,6 +85,12 @@ function CarePlanSection({
     onOpenUpload: () => void
     regenerating: boolean
 }) {
+    const auth = useAuth()
+    const [downloadError, setDownloadError] = useState<string>()
+    const download = async () => {
+        try { await orderService.downloadCarePlan(order.id) }
+        catch (error) { setDownloadError((error as Error).message || 'Download failed. Please try again.') }
+    }
     switch (order.status) {
         case 'pending':
             return (
@@ -115,23 +122,24 @@ function CarePlanSection({
                             Marked complete, but no content was returned.
                         </p>
                     )}
+                    {downloadError && <p role="alert">{downloadError}</p>}
                     <div className="flex flex-wrap gap-2">
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(orderService.getCarePlanDownloadUrl(order.id), '_blank')}
+                            onClick={() => { void download() }}
                         >
                             <Download className="mr-2 h-4 w-4" />
                             Download
                         </Button>
-                        <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
+                        {auth.pharmacist && <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
                             <RefreshCw className="mr-2 h-4 w-4" />
                             {regenerating ? 'Regenerating…' : 'Regenerate'}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={onOpenUpload}>
+                        </Button>}
+                        {auth.pharmacist && <Button variant="outline" size="sm" onClick={onOpenUpload}>
                             <Upload className="mr-2 h-4 w-4" />
                             Upload New
-                        </Button>
+                        </Button>}
                     </div>
                 </div>
             )
@@ -142,14 +150,14 @@ function CarePlanSection({
                         {order.message ?? 'Care plan generation failed.'}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
+                        {auth.pharmacist && <Button variant="outline" size="sm" onClick={onRegenerate} disabled={regenerating}>
                             <RefreshCw className="mr-2 h-4 w-4" />
                             {regenerating ? 'Retrying…' : 'Retry'}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={onOpenUpload}>
+                        </Button>}
+                        {auth.pharmacist && <Button variant="outline" size="sm" onClick={onOpenUpload}>
                             <Upload className="mr-2 h-4 w-4" />
                             Upload Manual
-                        </Button>
+                        </Button>}
                     </div>
                 </div>
             )
@@ -223,6 +231,9 @@ export function OrderDetailPage() {
 
     return (
         <div className="space-y-4">
+            {(regenerateCarePlan.error || uploadCarePlan.error) && <p role="alert" className="text-red-700">
+                {(regenerateCarePlan.error || uploadCarePlan.error)?.message}
+            </p>}
             {/* Header: back link + order number + status badge */}
             <div>
                 <Link to="/orders" className="text-sm text-blue-600 hover:underline">

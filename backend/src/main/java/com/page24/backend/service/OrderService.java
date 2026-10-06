@@ -21,6 +21,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.page24.backend.security.Audited;
+import com.page24.backend.security.Actor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,6 +52,7 @@ import java.util.stream.Collectors;
  * The controller now delegates to this service and returns its result to the frontend.
  */
 @Service
+@PreAuthorize("hasAnyRole('ASSISTANT', 'PHARMACIST')")
 @RequiredArgsConstructor
 @Slf4j
 public class OrderService {
@@ -69,6 +73,7 @@ public class OrderService {
      * This logic previously lived in OrderController's createOrder() method.
      */
     @Transactional
+    @Audited("ORDER_CREATED")
     public OrderResponse createOrder(CreateOrderRequest request) {
         List<Warning> warnings = new ArrayList<>();
 
@@ -199,6 +204,8 @@ public class OrderService {
         Order order = new Order();
         order.setPatient(patient);
         order.setProvider(provider);
+        order.setCreatedBySubject(Actor.subject());
+        order.setUpdatedBySubject(Actor.subject());
         order.setMedicationName(request.getMedicationName());
         order.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
         order.setAdditionalDiagnoses(request.getAdditionalDiagnoses());
@@ -243,6 +250,8 @@ public class OrderService {
      * transaction commits.
      */
     @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("CAREPLAN_REGENERATED")
     public OrderResponse regenerateCarePlan(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
@@ -261,6 +270,8 @@ public class OrderService {
         carePlan.setContent(null);
         carePlan.setErrorMessage(null);
         carePlan.setUploaded(false);   // a fresh LLM run replaces any prior manual upload
+        order.setUpdatedBySubject(Actor.subject());
+        orderRepository.save(order);
         carePlanRepository.save(carePlan);
 
         carePlanQueue.enqueue(carePlan.getId());
@@ -273,6 +284,8 @@ public class OrderService {
      * Exactly one of `content` (pasted text) or `file` must be provided.
      */
     @Transactional
+    @PreAuthorize("hasRole('PHARMACIST')")
+    @Audited("CAREPLAN_UPLOADED")
     public OrderResponse uploadCarePlan(Long id, String content, MultipartFile file) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
@@ -287,6 +300,8 @@ public class OrderService {
         carePlan.setStatus(CarePlan.Status.COMPLETED);
         carePlan.setErrorMessage(null);
         carePlan.setUploaded(true);
+        order.setUpdatedBySubject(Actor.subject());
+        orderRepository.save(order);
         carePlanRepository.save(carePlan);
 
         return orderMapper.toResponse(order, carePlan);
@@ -520,6 +535,7 @@ public class OrderService {
      *
      * Returns byte[]; the controller only sets the HTTP response headers.
      */
+    @Audited("CAREPLAN_DOWNLOADED")
     public CarePlanDownload downloadCarePlan(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));

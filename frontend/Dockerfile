@@ -2,9 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files first so `npm install` is cached unless deps change
+# Install exactly the locked dependencies; cache until package files change.
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . .

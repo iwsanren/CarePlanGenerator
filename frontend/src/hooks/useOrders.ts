@@ -53,7 +53,7 @@ export function useOrder(id: number) {
 
         // A missing order will never succeed on retry, so fail fast for it.
         // Genuine transient errors (a network blip) still get one retry.
-        retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 1,
+        retry: (failureCount, error) => !isNotFoundError(error) && ![401, 403].includes((error as ApiError).status || 0) && failureCount < 1,
     })
 }
 
@@ -100,6 +100,7 @@ export function useCarePlanStatus(id: number) {
         queryFn: () => orderService.getCarePlanStatus(id),
         enabled: Number.isFinite(id),
         refetchInterval: (query) => {
+            if ([401, 403].includes((query.state.error as ApiError)?.status || 0)) return false
             const status = query.state.data?.status
             return status && ACTIVE_STATUSES.includes(status) ? 3000 : false
         },

@@ -29,6 +29,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  */
 @Service
 @Profile("!lambda")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "careplan.worker.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class CarePlanWorker {
@@ -57,7 +59,8 @@ public class CarePlanWorker {
     }
 
     private void processTask(Long carePlanId) {
-        log.info("🔄 Worker picked up task: carePlanId={}", carePlanId);
+        // Queue messages contain only an ID; execution never borrows an employee token.
+        log.info("System worker picked up task: carePlanId={}", carePlanId);
 
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
             carePlan.setStatus(CarePlan.Status.PROCESSING);

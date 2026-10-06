@@ -1,0 +1,6 @@
+target
+auth-test.log
+.env
+.env.*
+!.env.example
+.git

@@ -54,10 +54,18 @@ public class Order {
     @Column(name = "confirmed_not_duplicate")
     private boolean confirmedNotDuplicate = false;
 
+    @Column(name = "created_by_subject")
+    private String createdBySubject;
+
+    @Column(name = "updated_by_subject")
+    private String updatedBySubject;
+
     @PrePersist
     protected void onCreate() {
         // Keep an explicitly supplied timestamp for imports and reports; new
         // orders created by the application still receive the current time.
+        if (createdBySubject == null) createdBySubject = "legacy";
+        if (updatedBySubject == null) updatedBySubject = createdBySubject;
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }

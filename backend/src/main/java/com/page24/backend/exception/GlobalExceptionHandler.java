@@ -18,6 +18,13 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    // Method authorization can fail inside MVC, after the filter chain's URL checks.
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                new ApiErrorResponse("error", "ACCESS_DENIED", "Permission denied", null, 403));
+    }
+
     @ExceptionHandler(CarePlanNotReadyException.class)
     public ResponseEntity<Map<String, String>> handleCarePlanNotReady(CarePlanNotReadyException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

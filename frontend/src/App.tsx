@@ -1,3 +1,4 @@
+import { AuthGate } from './auth/AuthGate'
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { NewOrderPage } from '@/pages/NewOrderPage'
@@ -6,13 +7,13 @@ import { OrderDetailPage } from '@/pages/OrderDetailPage'
 
 function App() {
   return (
-    <Layout>
+    <AuthGate><Layout>
       <Routes>
         <Route path="/" element={<NewOrderPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
       </Routes>
-    </Layout>
+    </Layout></AuthGate>
   )
 }
 
