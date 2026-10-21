@@ -4,7 +4,7 @@
 
 A full-stack web application for specialty pharmacies to automatically generate care plans using LLM technology.
 
-The Docker/Spring MVC application now uses **Keycloak + Spring Security JWT authentication** with assistant/pharmacist permissions. See the [Chinese/English interview guide](notes/authentication-interview.md) and [verification evidence](notes/authentication-verification.md). The AWS Lambda training path has **not** received this authentication implementation.
+The Docker/Spring MVC application now uses **Keycloak + Spring Security JWT authentication** with assistant/pharmacist permissions. 
 
 ## Background
 
