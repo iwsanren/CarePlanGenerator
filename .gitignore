@@ -30,3 +30,5 @@ backend/auth-test.log
 frontend/test-results/
 frontend/playwright-report/
 .env
+
+.claude/
