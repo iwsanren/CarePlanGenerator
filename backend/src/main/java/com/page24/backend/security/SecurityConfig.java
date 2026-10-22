@@ -75,18 +75,26 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain api(HttpSecurity http, JwtAuthenticationConverter converter) throws Exception {
+    SecurityFilterChain api(HttpSecurity http, JwtAuthenticationConverter converter,
+                            @Value("${springdoc.api-docs.enabled:false}") boolean docsEnabled) throws Exception {
         return http.cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(a -> a
-                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/export", "/api/v1/export/**", "/api/v1/reports/**").hasRole("PHARMACIST")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/regenerate", "/api/v1/orders/*/careplan/upload").hasRole("PHARMACIST")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/patients/**", "/api/v1/providers/**").hasRole("PHARMACIST")
-                        .requestMatchers("/api/v1/**").hasAnyRole("ASSISTANT", "PHARMACIST")
-                        .anyRequest().denyAll())
+                .authorizeHttpRequests(a -> {
+                    a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+                    // Only when docs are enabled: spec + Swagger UI static assets are public (no PHI, only API shapes).
+                    // Registered before denyAll(); with docs off these paths stay denied as before.
+                    if (docsEnabled) {
+                        a.requestMatchers(HttpMethod.GET, "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml",
+                                "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                    }
+                    a.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/v1/export", "/api/v1/export/**", "/api/v1/reports/**").hasRole("PHARMACIST")
+                            .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/regenerate", "/api/v1/orders/*/careplan/upload").hasRole("PHARMACIST")
+                            .requestMatchers(HttpMethod.DELETE, "/api/v1/patients/**", "/api/v1/providers/**").hasRole("PHARMACIST")
+                            .requestMatchers("/api/v1/**").hasAnyRole("ASSISTANT", "PHARMACIST")
+                            .anyRequest().denyAll();
+                })
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((q, r, ex) -> unauthorized(r))
                         .accessDeniedHandler((q, r, ex) -> error(r, 403, "ACCESS_DENIED", "Permission denied")))

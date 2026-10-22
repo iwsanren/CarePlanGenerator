@@ -10,6 +10,7 @@ import com.page24.backend.dto.UpdatePatientResponse;
 import com.page24.backend.dto.PatientOrdersResponse;
 import com.page24.backend.service.PatientService;
 import com.page24.backend.validation.IdentifierFormats;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/patients")
 @RequiredArgsConstructor
+@Tag(name = "Patients", description = "Patient records (DELETE is PHARMACIST only)")
 public class PatientController {
 
     private final PatientService patientService;

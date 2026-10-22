@@ -2,6 +2,11 @@ package com.page24.backend.controller;
 
 import com.page24.backend.dto.ReportFile;
 import com.page24.backend.service.ReportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,10 +21,16 @@ import java.nio.charset.StandardCharsets;
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
+@Tag(name = "Reports", description = "Filtered CSV reports (PHARMACIST only)")
 public class ReportController {
 
     private final ReportService reportService;
 
+    @Operation(summary = "Export orders as CSV with optional filters",
+            description = "PHARMACIST only. Filters: start_date, end_date, status, provider_id. "
+                    + "Returns a CSV file download (Content-Disposition: attachment).",
+            responses = @ApiResponse(responseCode = "200", description = "CSV file",
+                    content = @Content(mediaType = "text/csv", schema = @Schema(type = "string", format = "binary"))))
     @GetMapping("/orders/export")
     public ResponseEntity<byte[]> exportOrders(
             @RequestParam(required = false) String format,
