@@ -39,10 +39,19 @@ public class CreateOrderHandler {
     private final Validator validator;
 
     public CreateOrderHandler() {
-        ConfigurableApplicationContext context = LambdaSpringContext.getContext();
-        this.objectMapper = context.getBean(ObjectMapper.class);
-        this.orderService = context.getBean(OrderService.class);
-        this.validator = context.getBean(Validator.class);
+        this(LambdaSpringContext.getContext());
+    }
+
+    private CreateOrderHandler(ConfigurableApplicationContext context) {
+        this(context.getBean(ObjectMapper.class),
+                context.getBean(OrderService.class),
+                context.getBean(Validator.class));
+    }
+
+    CreateOrderHandler(ObjectMapper objectMapper, OrderService orderService, Validator validator) {
+        this.objectMapper = objectMapper;
+        this.orderService = orderService;
+        this.validator = validator;
     }
 
     public Map<String, Object> handleRequest(Map<String, Object> event) {
