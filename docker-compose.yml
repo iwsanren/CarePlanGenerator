@@ -95,6 +95,9 @@ services:
       CAREPLAN_ALLOWED_ORIGINS: ${CAREPLAN_ALLOWED_ORIGINS:-http://localhost:3000}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      # Local demo only: serve /v3/api-docs and /swagger-ui/index.html (off by default in the app)
+      SPRINGDOC_API_DOCS_ENABLED: ${SPRINGDOC_API_DOCS_ENABLED:-true}
+      SPRINGDOC_SWAGGER_UI_ENABLED: ${SPRINGDOC_SWAGGER_UI_ENABLED:-true}
     ports:
       - "8080:8080"
     healthcheck:

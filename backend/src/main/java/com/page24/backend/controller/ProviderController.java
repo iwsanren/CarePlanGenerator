@@ -6,6 +6,7 @@ import com.page24.backend.dto.PatchProviderRequest;
 import com.page24.backend.dto.ProviderResponse;
 import com.page24.backend.dto.UpdateProviderRequest;
 import com.page24.backend.service.ProviderService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RestController
 @RequestMapping("/api/v1/providers")
 @RequiredArgsConstructor
+@Tag(name = "Providers", description = "Provider records (DELETE is PHARMACIST only)")
 public class ProviderController {
 
     private final ProviderService providerService;

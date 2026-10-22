@@ -14,8 +14,6 @@ The Docker/Spring MVC application now uses **Keycloak + Spring Security JWT auth
 
 **Solution:** A web application that allows medical assistants to input patient/order information and automatically generate care plans using an LLM.
 
-This implementation is built as a guided, day-by-day learning project: a Java/Spring Boot + React port of a Python/Django reference implementation, built up from a synchronous MVP to an async, queue-backed, monitored, cloud-deployable app. See [Current Status](#current-status) for what stage it's at.
-
 ## Screenshots
 
 ### Employee sign-in
@@ -353,6 +351,31 @@ PUT    /api/v1/providers/{id}
 PATCH  /api/v1/providers/{id}
 DELETE /api/v1/providers/{id}
 ```
+
+### API documentation (OpenAPI / Swagger UI)
+
+The REST API is described with OpenAPI 3 (springdoc-openapi) and browsable in Swagger UI. The docs are **off by default** (the app serves neither the spec nor the UI) and are meant for local development and demos:
+
+- `docker compose up` turns them on for the backend container (`SPRINGDOC_API_DOCS_ENABLED` / `SPRINGDOC_SWAGGER_UI_ENABLED`, default `true` in `docker-compose.yml`; set them to `false` to disable).
+- Running the backend directly: use the `docs` Spring profile, e.g. `./mvnw spring-boot:run -Dspring-boot.run.profiles=docs`.
+
+| What | URL (backend on port 8080) |
+|------|-----|
+| Swagger UI | http://localhost:8080/swagger-ui/index.html |
+| OpenAPI spec (JSON) | http://localhost:8080/v3/api-docs |
+
+When enabled, only these documentation paths are public (they describe request/response shapes and contain no patient data). Every `/api/v1/**` endpoint still requires a valid employee token and keeps its role rules; calling it from Swagger UI without authorizing returns 401.
+
+**Authorize with a token** (no Keycloak login is wired into Swagger UI):
+
+1. Open the React app (http://localhost:3000) and sign in as `assistant` or `pharmacist`.
+2. Open the browser DevTools → Network tab and click any request to `/api/v1/...`.
+3. Copy the value after `Bearer ` in its `Authorization` request header (the access token, not the ID token).
+4. In Swagger UI click **Authorize**, paste only the token into the `bearerAuth` field, and confirm.
+
+Access tokens are short-lived; repeat the steps if requests start returning 401. Tokens are credentials: do not put them in URLs or commit them.
+
+The three `/api/v1/intake/*` operations include small synthetic example payloads (JSON, XML, CSV) for the "Try it out" panel.
 
 ## Running Tests
 
