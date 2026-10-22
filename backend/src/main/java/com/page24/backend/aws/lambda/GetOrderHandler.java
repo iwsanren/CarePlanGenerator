@@ -19,11 +19,16 @@ import java.util.Map;
  */
 public class GetOrderHandler {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // findAndRegisterModules() adds the Java time module, needed to serialize LocalDate fields.
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final OrderService orderService;
 
     public GetOrderHandler() {
-        this.orderService = LambdaSpringContext.getContext().getBean(OrderService.class);
+        this(LambdaSpringContext.getContext().getBean(OrderService.class));
+    }
+
+    GetOrderHandler(OrderService orderService) {
+        this.orderService = orderService;
     }
 
     public Map<String, Object> handleRequest(Map<String, Object> event) {
