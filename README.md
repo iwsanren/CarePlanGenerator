@@ -14,6 +14,23 @@ The Docker/Spring MVC application now uses **Keycloak + Spring Security JWT auth
 
 **Solution:** A web application that allows medical assistants to input patient/order information and automatically generate care plans using an LLM.
 
+## Architecture
+
+```mermaid
+flowchart TD
+  U["Pharmacy staff"] --> FE["React and TypeScript"];
+  KC["Keycloak"] -.->|"issues tokens"| FE;
+  FE -->|"JWT"| API["Spring Boot REST API"];
+  EXT["External sources: JSON, XML, CSV"] --> AD["Intake adapters"];
+  AD --> API;
+  API --> PG[("PostgreSQL")];
+  API -->|"enqueue"| R[("Redis queue")];
+  R --> W["Scheduled worker"];
+  W -->|"retry x3"| LLM["LLM provider"];
+  W --> PG;
+  API --> M["Actuator, Prometheus, Grafana"];
+```
+
 ## Screenshots
 
 ### Employee sign-in
@@ -55,35 +72,22 @@ These screenshots show role-based UI controls. Spring Security independently enf
 
 ![Order detail](docs/screenshots/order-detail.png)
 
-## Current Status
-
-Implemented pieces:
-
-- React frontend for creating orders and viewing care plan generation status
-- Spring Boot REST API
-- PostgreSQL persistence for `Patient`, `Provider`, `Order`, and `CarePlan`
-- Redis-backed queue for care plan generation jobs
-- Scheduled worker that consumes queued jobs and calls an LLM provider
-- Polling API for checking care plan generation status
-- Request validation, duplicate detection, warning handling, and unified error responses
-- Adapter Pattern for ingesting orders from different external sources
-- CSV export/reporting endpoints
-- Standalone Patient/Provider CRUD APIs
-- Unit and integration tests
-- Keycloak login (Authorization Code + PKCE S256), JWT validation and employee role authorization
-- Operator audit records for creation, regeneration, uploads, downloads, exports and restricted deletes
-- Prometheus and Grafana monitoring through an authenticated root Compose overlay
-- AWS Lambda / SQS handler and packaging practice code, plus Terraform practice stacks
-
 ## Features
 
-- ✅ Web form for patient/provider/order data entry
-- ✅ Real-time input validation (NPI, MRN, ICD-10, etc.)
-- ✅ Duplicate detection for patients, providers, and orders
-- ✅ LLM-powered care plan generation
-- ✅ Async processing with Redis + a scheduled worker
+- ✅ Web form for patient/provider/order data entry (React + TypeScript)
+- ✅ Real-time input validation (NPI, MRN, ICD-10, etc.) and unified error responses
+- ✅ Duplicate detection for patients, providers, and orders, with warning handling
+- ✅ LLM-powered care plan generation (OpenAI / Anthropic Claude / local mock)
+- ✅ Async processing with a Redis-backed queue and a scheduled worker, plus a polling API for generation status
 - ✅ Care plan download, regenerate, and manual upload
-- ✅ Export all order/care plan data to CSV
+- ✅ Adapter Pattern for ingesting orders from different external sources (JSON, XML, CSV)
+- ✅ CSV export/reporting endpoints and standalone Patient/Provider CRUD APIs
+- ✅ Keycloak login (Authorization Code + PKCE S256), JWT validation and role-based authorization (assistant / pharmacist)
+- ✅ Operator audit records for creation, regeneration, uploads, downloads, exports and restricted deletes
+- ✅ Prometheus and Grafana monitoring through an authenticated root Compose overlay
+- ✅ OpenAPI 3 / Swagger UI for the REST API
+- ✅ Unit and integration tests, with GitHub Actions CI on every pull request
+- ✅ AWS Lambda / SQS intake handler and Terraform stacks (API Gateway, Lambda, SQS, RDS), deployed and verified in a personal AWS account 
 
 ## Tech Stack
 
@@ -95,7 +99,11 @@ Implemented pieces:
 | Task Queue | Redis 7 + Spring `@Scheduled` worker (`CarePlanWorker`) |
 | LLM | OpenAI / Anthropic Claude / local mock (configurable) |
 | Frontend | React 18 + TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS |
-| Infrastructure | Docker, Docker Compose, Terraform (AWS practice stacks) |
+| Testing | JUnit 5, Mockito, H2, Testcontainers (PostgreSQL), JaCoCo, Playwright (e2e) |
+| CI | GitHub Actions (Maven `verify` + JaCoCo report, frontend build) |
+| Observability | Spring Boot Actuator, Micrometer, Prometheus, Grafana |
+| API docs | OpenAPI 3 / Swagger UI (springdoc-openapi) |
+| Infrastructure | Docker, Docker Compose, Terraform (AWS Lambda, API Gateway, SQS, RDS) |
 
 ## Quick Start
 
@@ -145,15 +153,20 @@ These defaults are **local development only**. Supply independent credentials th
 | `pharmacist` | `PharmacistDemo123!` | `careplan-api` client role `PHARMACIST` |
 | `admin` | `local-admin-only` | Keycloak administration in the master realm; no application staff role |
 
-Click **Sign in** and use Keycloak's login page. Public registration and the frontend password grant are disabled. Administrators create employees in realm `careplan` and assign a **client role from `careplan-api`**. The public SPA client is `careplan-web`; it contains no client secret. Both employee roles share the pharmacy's existing records.
-
 All `/api/v1/**` endpoints require a valid employee access token. Assistants can view/create/update basic records and download completed plans. Pharmacists additionally regenerate/upload plans, use both export endpoints and delete patients/providers (subject to existing business constraints). Frontend visibility is supplemented by independent backend URL and service checks. A verified account with no staff role receives 403.
+
+<details>
+<summary>Authentication details (login flow, realm import, tokens, environment)</summary>
+
+Click **Sign in** and use Keycloak's login page. Public registration and the frontend password grant are disabled. Administrators create employees in realm `careplan` and assign a **client role from `careplan-api`**. The public SPA client is `careplan-web`; it contains no client secret. Both employee roles share the pharmacy's existing records.
 
 Realm import is versioned in `keycloak/careplan-realm.json`; passwords are environment placeholders. Import runs only when the realm is absent. Updating `.env` does **not** reset users/passwords in an existing Keycloak database: change them through the admin console. Existing pharmacy data is preserved and legacy orders are labeled `legacy` in the audit subject columns. Do not remove database volumes to apply authentication changes.
 
 For direct API tools, send `Authorization: Bearer <access_token>` with an access token from the browser's Authorization Code login. Do not put tokens in URLs or use the ID token for API calls. Downloads/exports in React use authenticated Axios blob requests.
 
 Root `.env` configures the public Keycloak URL, demo/admin/Keycloak DB credentials, pharmacy DB password, CORS and monitoring credentials. `backend/.env` configures optional LLM settings. Changing the public URL also requires updating the SPA redirect/logout URIs and web origins in Keycloak. The guide explains the separate public issuer and internal Docker JWKS URL. PostgreSQL initialization passwords also apply only to a new database; rotate existing DB credentials deliberately.
+
+</details>
 
 ### Reproduce authentication verification
 
@@ -391,8 +404,7 @@ Windows PowerShell:
 ```powershell
 .\mvnw.cmd test
 ```
-
-Tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests. See [verification](notes/authentication-verification.md) for the commands, cryptographic tests and browser tests.
+Most tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. PostgreSQL-specific behaviour (JPA persistence and Flyway migrations) is verified against a real PostgreSQL container with Testcontainers (`OrderPersistencePostgresTest`, `FlywayMigrationPostgresTest`); these tests are skipped automatically when Docker is not available. Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests.
 
 ## Common Commands
 
