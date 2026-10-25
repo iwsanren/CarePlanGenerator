@@ -1,6 +1,7 @@
 package com.page24.backend.repository;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +17,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,6 +39,15 @@ class FlywayMigrationPostgresTest {
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
 
+    // Tables created by V2__spring_batch_schema.sql (Spring Batch 6 job repository), alphabetically
+    private static final List<String> EXPECTED_BATCH_TABLES = List.of(
+            "batch_job_execution",
+            "batch_job_execution_context",
+            "batch_job_execution_params",
+            "batch_job_instance",
+            "batch_step_execution",
+            "batch_step_execution_context");
+
     @BeforeEach
     void resetDatabase() throws SQLException {
         // Every test starts from a completely empty schema.
@@ -49,11 +60,11 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: exactly one migration ran and it is recorded as successful
+        // Then: V1 and V2 ran and both are recorded as successful
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(1);
-        assertThat(query("SELECT version || ':' || success FROM flyway_schema_history WHERE version IS NOT NULL"))
-                .containsExactly("1:true");
+        assertThat(result.migrationsExecuted).isEqualTo(2);
+        assertThat(query("SELECT version || ':' || success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
+                .containsExactly("1:true", "2:true");
 
         // audit_events has the expected columns, types and nullability
         assertThat(query("""
@@ -96,6 +107,57 @@ class FlywayMigrationPostgresTest {
         // pre-existing rows get the column default
         assertThat(query("SELECT created_by_subject || '/' || updated_by_subject FROM orders"))
                 .containsExactly("legacy/legacy", "legacy/legacy");
+        // history: the baseline marker (0) for the adopted schema, then V1 and V2 applied on top of it
+        assertThat(query("SELECT version FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
+                .containsExactly("0", "1", "2");
+        assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
+    }
+
+    @Test
+    @DisplayName("V2 creates the Spring Batch tables, sequences and constraints on an empty database")
+    void v2CreatesSpringBatchSchema() throws SQLException {
+        flyway().migrate();
+
+        // PostgreSQL folds the unquoted names of the script to lower case
+        assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
+        assertThat(query("SELECT sequencename FROM pg_sequences WHERE sequencename LIKE 'batch\\_%' ORDER BY sequencename"))
+                .containsExactly("batch_job_execution_seq", "batch_job_instance_seq", "batch_step_execution_seq");
+        // the one-instance-per-(name, key) rule that makes job restarts and duplicate launches detectable
+        assertThat(query("SELECT conname FROM pg_constraint WHERE conname = 'job_inst_un'")).containsExactly("job_inst_un");
+        // the metadata tables start empty
+        assertThat(query("SELECT count(*)::text FROM batch_job_instance")).containsExactly("0");
+    }
+
+    @Test
+    @DisplayName("V2 applies on top of a database where only V1 was applied")
+    void v2AppliesOnDatabaseWithV1AlreadyApplied() throws SQLException {
+        // Given: a database migrated up to V1 only, like an environment deployed before Spring Batch existed
+        MigrateResult v1Only = flyway(configure -> configure.target("1")).migrate();
+        assertThat(v1Only.migrationsExecuted).isEqualTo(1);
+        assertThat(batchTables()).isEmpty();
+        execute("INSERT INTO audit_events (actor_subject, action, occurred_at) VALUES ('user-1', 'LOGIN', now())");
+
+        // When
+        MigrateResult result = flyway().migrate();
+
+        // Then: only V2 ran, V1 data is untouched
+        assertThat(result.success).isTrue();
+        assertThat(result.migrationsExecuted).isEqualTo(1);
+        assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
+        assertThat(query("SELECT actor_subject FROM audit_events")).containsExactly("user-1");
+    }
+
+    @Test
+    @DisplayName("V2 does not fail if the Batch tables already exist")
+    void v2ToleratesExistingBatchTables() throws SQLException {
+        // Given: the tables were created by hand before Flyway ran V2
+        flyway(configure -> configure.target("1")).migrate();
+        execute("CREATE TABLE batch_job_instance (job_instance_id BIGINT PRIMARY KEY)");
+
+        // When / Then: IF NOT EXISTS keeps the existing table and creates the rest
+        MigrateResult result = flyway().migrate();
+        assertThat(result.success).isTrue();
+        assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
     }
 
     @Test
@@ -124,12 +186,24 @@ class FlywayMigrationPostgresTest {
     }
 
     private Flyway flyway() {
-        return Flyway.configure()
+        return flyway(configure -> { });
+    }
+
+    private Flyway flyway(Consumer<FluentConfiguration> customizer) {
+        FluentConfiguration configuration = Flyway.configure()
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
-                .baselineVersion("0")
-                .load();
+                .baselineVersion("0");
+        customizer.accept(configuration);
+        return configuration.load();
+    }
+
+    private List<String> batchTables() throws SQLException {
+        return query("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name LIKE 'batch\\_%'
+                ORDER BY table_name""");
     }
 
     private Connection connect() throws SQLException {
