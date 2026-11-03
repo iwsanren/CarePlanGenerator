@@ -406,6 +406,50 @@ Windows PowerShell:
 ```
 Most tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. PostgreSQL-specific behaviour (JPA persistence and Flyway migrations) is verified against a real PostgreSQL container with Testcontainers (`OrderPersistencePostgresTest`, `FlywayMigrationPostgresTest`); these tests are skipped automatically when Docker is not available. Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests.
 
+## Code Quality (Checkstyle and SpotBugs)
+
+Two static analysis checks are bound to the Maven `verify` phase, so `./mvnw verify` (and therefore CI) fails when either reports a problem. They never run during `mvn package -DskipTests`, which is what the backend Dockerfile uses.
+
+| Tool | What it reads | Configuration | Scope |
+|---|---|---|---|
+| Checkstyle 12.3.1 (Maven plugin 3.6.0) | Java source files | `backend/config/checkstyle/checkstyle.xml` | `src/main` only: 120-column lines, no wildcard imports, no unused imports, braces on every `if`, no tabs, final newline, naming rules |
+| SpotBugs 4.10.5 (Maven plugin 4.10.5.0) | Compiled classes in `target/classes` | `backend/config/spotbugs/spotbugs-exclude.xml` | Only High-priority findings fail the build |
+
+Checkstyle 13 and later need Java 21, while CI and the Dockerfile build with Java 17, so the engine is pinned to the 12.x line.
+
+Run them on their own from `backend/`:
+
+```bash
+./mvnw checkstyle:check
+./mvnw compile spotbugs:check
+```
+
+Each SpotBugs suppression must name the class and bug pattern and carry a comment explaining why it is safe; do not switch off whole bug categories. SpotBugs only logs a message (it does not fail) if the exclude file cannot be parsed, so look for `Unable to read filter` in the build log after editing it.
+
+### IntelliJ IDEA setup
+
+Point both IDE plugins at the same files Maven uses, so the editor shows what `verify` will enforce.
+
+**Checkstyle** (plugin: *CheckStyle-IDEA*)
+
+1. Install the plugin: *Settings | Plugins | Marketplace*, search for `CheckStyle-IDEA`, restart the IDE.
+2. Open *Settings | Tools | Checkstyle*.
+3. Set *Checkstyle version* to `12.3.1` (the same engine as Maven, otherwise results can differ).
+4. Set *Scan Scope* to `Only Java sources (but not tests)` to match the Maven configuration.
+5. Under *Configuration File* click `+`, choose *Use a local Checkstyle file*, select `backend/config/checkstyle/checkstyle.xml`, give it a description such as `CarePlan backend`, and finish the dialog.
+6. Tick the *Active* box next to the new entry and click *Apply*.
+7. Use the *Checkstyle* tool window (View | Tool Windows | Checkstyle) to scan the current file or the whole module.
+
+**SpotBugs** (plugin: *SpotBugs*)
+
+1. Install the plugin: *Settings | Plugins | Marketplace*, search for `SpotBugs`, restart the IDE.
+2. Open *Settings | Tools | SpotBugs*.
+3. On the *Detector* tab set the report threshold (minimum rank/priority) to `High`, matching `threshold=High` in `pom.xml`.
+4. On the *Filter* tab, under *Exclude filter files*, click `+` and select `backend/config/spotbugs/spotbugs-exclude.xml`.
+5. Build the module first (*Build | Build Project*), because SpotBugs analyses compiled classes, then run the analysis from the *SpotBugs* tool window or the editor context menu.
+
+Menu and option names differ slightly between plugin versions; the settings that matter are the Checkstyle engine version, the config file path, and the SpotBugs threshold and exclude filter file.
+
 ## Common Commands
 
 ### Stop Services
