@@ -82,7 +82,8 @@ public class ReportService {
         CsvWriter.appendRow(csv, HEADER);
 
         orders.stream()
-                .filter(order -> matches(order, carePlansByOrderId.get(order.getId()), startDate, endDate, status, providerId))
+                .filter(order -> matches(order, carePlansByOrderId.get(order.getId()),
+                        startDate, endDate, status, providerId))
                 .sorted(Comparator.comparing(Order::getCreatedAt, Comparator.reverseOrder())
                         .thenComparing(Order::getId, Comparator.reverseOrder()))
                 .forEach(order -> CsvWriter.appendRow(csv, toRow(order, carePlansByOrderId.get(order.getId()))));

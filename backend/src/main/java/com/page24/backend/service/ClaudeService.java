@@ -35,7 +35,8 @@ public class ClaudeService implements BaseLLMService {
     @Override
     public String generateCarePlan(String patientInfo) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("Claude API key is missing. Set llm.claude.api.key or switch llm.provider.");
+            throw new IllegalStateException(
+                    "Claude API key is missing. Set llm.claude.api.key or switch llm.provider.");
         }
 
         try {

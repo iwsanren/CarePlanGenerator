@@ -14,7 +14,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Day9 intake endpoints for external sources.
@@ -83,8 +87,11 @@ public class IntakeController {
             """;
 
     private static final String HOSPITAL_D_EXAMPLE = """
-            source_system,request_id,created_at,pt_id,pt_given,pt_family,pt_dob_yyyymmdd,doc_npi,doc_full_name,drug_label,dx_primary,dx_extra,med_hist_blob,clinical_note_blob
-            EXAMPLE_HOSPITAL,REQ-EXAMPLE-0001,2026-03-19T10:30:00Z,000001,Test,Patient,20000101,0000000001,Dr. Demo Provider,IVIG,G70.00,I10,Example medication 10mg daily,Synthetic example note.
+            source_system,request_id,created_at,pt_id,pt_given,pt_family,pt_dob_yyyymmdd,doc_npi,doc_full_name,\
+            drug_label,dx_primary,dx_extra,med_hist_blob,clinical_note_blob
+            EXAMPLE_HOSPITAL,REQ-EXAMPLE-0001,2026-03-19T10:30:00Z,000001,Test,Patient,20000101,\
+            0000000001,Dr. Demo Provider,\
+            IVIG,G70.00,I10,Example medication 10mg daily,Synthetic example note.
             """;
 
     private static final String CONFIRM_DESCRIPTION =
@@ -123,7 +130,8 @@ public class IntakeController {
     }
 
     @Operation(summary = "Create an order from Hospital D (CSV)",
-            description = "Body is a raw CSV document: one header row and one data row (Content-Type: text/csv or text/plain).",
+            description = "Body is a raw CSV document: one header row and one data row "
+                    + "(Content-Type: text/csv or text/plain).",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = {
                     @Content(mediaType = "text/csv", schema = @Schema(type = "string"),
                             examples = @ExampleObject(name = "Hospital D", value = HOSPITAL_D_EXAMPLE)),

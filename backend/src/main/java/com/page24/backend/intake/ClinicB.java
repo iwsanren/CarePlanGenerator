@@ -138,6 +138,7 @@ clinic_b_data = {
         "Atorvastatin 20mg at bedtime",
         "Aspirin 81mg once daily"
     ],
-    "clinical_notes": "Patient presents with progressive weakness over past 3 weeks. Diagnosed with MG 6 months ago. Neuro consult recommends IVIG therapy. Patient educated on infusion process."
+    "clinical_notes": "Patient presents with progressive weakness over past 3 weeks. Diagnosed with MG 6 months ago.
+        Neuro consult recommends IVIG therapy. Patient educated on infusion process."
 }
  */

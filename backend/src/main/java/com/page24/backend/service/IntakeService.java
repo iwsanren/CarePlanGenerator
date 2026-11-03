@@ -4,7 +4,6 @@ import com.page24.backend.dto.CreateOrderRequest;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.intake.ClinicBAdapter;
-import com.page24.backend.intake.Common;
 import com.page24.backend.intake.HospitalDAdapter;
 import com.page24.backend.intake.IntakeAdapterFactory;
 import com.page24.backend.intake.InternalOrder;

@@ -5,8 +5,9 @@ import com.page24.backend.entity.AuditEvent;
 import com.page24.backend.repository.AuditEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.annotation.*;
-import org.springframework.context.annotation.*;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
@@ -27,8 +28,11 @@ public class AuditAspect {
         event.setActorSubject(Actor.subject());
         event.setAction(audited.value());
         event.setOccurredAt(Instant.now());
-        if (result instanceof OrderResponse order) event.setTargetId(order.getId());
-        else if (point.getArgs().length > 0 && point.getArgs()[0] instanceof Long id) event.setTargetId(id);
+        if (result instanceof OrderResponse order) {
+            event.setTargetId(order.getId());
+        } else if (point.getArgs().length > 0 && point.getArgs()[0] instanceof Long id) {
+            event.setTargetId(id);
+        }
         repository.save(event);
         return result;
     }

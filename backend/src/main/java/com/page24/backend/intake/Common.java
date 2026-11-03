@@ -9,8 +9,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Shared intake helpers for Day9 Step1/Step2.
@@ -19,33 +17,33 @@ import java.util.stream.Collectors;
  */
 public final class Common {
 
-	private Common() {
-	}
+    private Common() {
+    }
 
-	static final DateTimeFormatter US_DATE = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+    static final DateTimeFormatter US_DATE = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
-	public static LocalDate parseUsDate(String dateText) {
-		if (dateText == null || dateText.isBlank()) {
-			return null;
-		}
-		return LocalDate.parse(dateText.trim(), US_DATE);
-	}
+    public static LocalDate parseUsDate(String dateText) {
+        if (dateText == null || dateText.isBlank()) {
+            return null;
+        }
+        return LocalDate.parse(dateText.trim(), US_DATE);
+    }
 
-	public static List<String> safeList(List<String> values) {
-		return values == null ? Collections.emptyList() : values;
-	}
+    public static List<String> safeList(List<String> values) {
+        return values == null ? Collections.emptyList() : values;
+    }
 
-	public static Document parseXml(String xml) {
-		try {
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			factory.setNamespaceAware(false);
-			factory.setExpandEntityReferences(false);
-			factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    public static Document parseXml(String xml) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
 
-			return factory.newDocumentBuilder()
-					.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Invalid XML payload", e);
-		}
-	}
+            return factory.newDocumentBuilder()
+                    .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid XML payload", e);
+        }
+    }
 }

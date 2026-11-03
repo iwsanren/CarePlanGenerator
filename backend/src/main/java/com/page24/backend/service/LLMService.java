@@ -4,7 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 /**
  * Backward-compatible facade that can be removed after callers migrate.
- * Existing code may continue to call LLMService.generateCarePlan(...); requests are delegated to the Day 10 factory and provider.
+ * Existing code may continue to call LLMService.generateCarePlan(...); requests are delegated to the Day 10
+ * factory and provider.
  */
 @Service
 @Slf4j

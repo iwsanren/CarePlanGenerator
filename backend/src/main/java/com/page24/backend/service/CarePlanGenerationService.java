@@ -29,7 +29,8 @@ import org.springframework.stereotype.Service;
  *              backoff = @Backoff(delay = 2000, multiplier = 2))
  *   public void generateCarePlan(Long carePlanId) { ... }
  *
- * Both approaches retry automatically after failures, doubling the wait time between attempts through exponential backoff.
+ * Both approaches retry automatically after failures, doubling the wait time between attempts through
+ * exponential backoff.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,9 +48,11 @@ public class CarePlanGenerationService {
      *
      * @Retryable configuration:
      * - retryFor: Exception types that trigger a retry, here every Exception.
-     * - maxAttempts: Total number of attempts, including the initial call, so this permits one initial attempt and two retries.
+     * - maxAttempts: Total number of attempts, including the initial call, so this permits one initial attempt
+     *   and two retries.
      * - backoff.delay: Milliseconds to wait before the first retry (2 seconds).
-     * - backoff.multiplier: Factor applied to the wait time after each retry, producing exponential backoff (2 seconds, then 4, then 8).
+     * - backoff.multiplier: Factor applied to the wait time after each retry, producing exponential backoff
+     *   (2 seconds, then 4, then 8).
      *
      * Equivalent Celery settings:
      *   retry_backoff=True, retry_backoff_max=10, max_retries=3

@@ -101,7 +101,8 @@ public class GetOrderHandler {
         try {
             return objectMapper.writeValueAsString(body);
         } catch (JsonProcessingException ex) {
-            return "{\"type\":\"error\",\"code\":\"JSON_SERIALIZATION_FAILED\",\"message\":\"Failed to serialize response\",\"httpStatus\":500}";
+            return "{\"type\":\"error\",\"code\":\"JSON_SERIALIZATION_FAILED\","
+                    + "\"message\":\"Failed to serialize response\",\"httpStatus\":500}";
         }
     }
 }

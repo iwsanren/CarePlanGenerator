@@ -26,20 +26,25 @@ public class PharmaCorp {
         PharmaCorpPayload payload = new PharmaCorpPayload();
         payload.setSourceSystem(evalString(xpath, document, "/CareOrderRequest/RequestMetadata/SourceSystem/text()"));
         payload.setMrn(evalString(xpath, document, "/CareOrderRequest/PatientInformation/MedicalRecordNumber/text()"));
-        payload.setFirstName(evalString(xpath, document, "/CareOrderRequest/PatientInformation/PatientName/FirstName/text()"));
-        payload.setLastName(evalString(xpath, document, "/CareOrderRequest/PatientInformation/PatientName/LastName/text()"));
-        payload.setDob(parseDate(evalString(xpath, document, "/CareOrderRequest/PatientInformation/DateOfBirth/text()")));
+        payload.setFirstName(evalString(xpath, document,
+                "/CareOrderRequest/PatientInformation/PatientName/FirstName/text()"));
+        payload.setLastName(evalString(xpath, document,
+                "/CareOrderRequest/PatientInformation/PatientName/LastName/text()"));
+        payload.setDob(parseDate(evalString(xpath, document,
+                "/CareOrderRequest/PatientInformation/DateOfBirth/text()")));
 
         payload.setProviderName(evalString(xpath, document, "/CareOrderRequest/PrescriberInformation/FullName/text()"));
         payload.setProviderNpi(evalString(xpath, document, "/CareOrderRequest/PrescriberInformation/NPINumber/text()"));
 
-        payload.setPrimaryDiagnosis(evalString(xpath, document, "/CareOrderRequest/DiagnosisList/PrimaryDiagnosis/ICDCode/text()"));
+        payload.setPrimaryDiagnosis(evalString(xpath, document,
+                "/CareOrderRequest/DiagnosisList/PrimaryDiagnosis/ICDCode/text()"));
         payload.setSecondaryDiagnoses(evalNodeTexts(xpath, document,
                 "/CareOrderRequest/DiagnosisList/SecondaryDiagnoses/Diagnosis/ICDCode/text()"));
 
         payload.setMedicationName(evalString(xpath, document, "/CareOrderRequest/MedicationOrder/DrugName/text()"));
         payload.setMedicationHistory(evalMedicationHistory(xpath, document));
-        payload.setClinicalNotes(evalString(xpath, document, "/CareOrderRequest/ClinicalDocumentation/NarrativeText/text()"));
+        payload.setClinicalNotes(evalString(xpath, document,
+                "/CareOrderRequest/ClinicalDocumentation/NarrativeText/text()"));
 
         return payload;
     }
@@ -105,7 +110,8 @@ public class PharmaCorp {
                 String dosage = evalString(xpath, document, base + "/Dosage/text()");
                 String route = evalString(xpath, document, base + "/Route/text()");
                 String frequency = evalString(xpath, document, base + "/Frequency/text()");
-                result.add(String.format("%s %s %s %s", nullSafe(name), nullSafe(dosage), nullSafe(route), nullSafe(frequency)).trim());
+                result.add(String.format("%s %s %s %s",
+                        nullSafe(name), nullSafe(dosage), nullSafe(route), nullSafe(frequency)).trim());
             }
             return result;
         } catch (Exception e) {
@@ -228,7 +234,9 @@ partner_c_data = """<?xml version="1.0" encoding="UTF-8"?>
         <DocumentType>ProgressNote</DocumentType>
         <DocumentDate>2025-01-14</DocumentDate>
         <AuthoringProvider>Dr. Michael Chen</AuthoringProvider>
-        <NarrativeText>58 y/o male with known MG presenting with acute exacerbation. Symptoms include increased ptosis, diplopia, and dysphagia over past 10 days. FVC reduced to 65% predicted. Recommend IVIG 2g/kg divided over 5 days.</NarrativeText>
+        <NarrativeText>58 y/o male with known MG presenting with acute exacerbation. Symptoms include increased
+            ptosis, diplopia, and dysphagia over past 10 days. FVC reduced to 65% predicted. Recommend IVIG 2g/kg
+            divided over 5 days.</NarrativeText>
     </ClinicalDocumentation>
 </CareOrderRequest>
 

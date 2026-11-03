@@ -16,7 +16,9 @@ public class CarePlanRolesConverter implements Converter<Jwt, Collection<Granted
         Object access = jwt.getClaim("resource_access");
         if (!(access instanceof Map<?, ?> clients)
                 || !(clients.get("careplan-api") instanceof Map<?, ?> api)
-                || !(api.get("roles") instanceof Collection<?> roles)) return List.of();
+                || !(api.get("roles") instanceof Collection<?> roles)) {
+            return List.of();
+        }
         Set<String> allowed = Set.of("ASSISTANT", "PHARMACIST");
         return roles.stream().filter(String.class::isInstance).map(String.class::cast)
                 .filter(allowed::contains).distinct()

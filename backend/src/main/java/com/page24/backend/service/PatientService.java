@@ -240,7 +240,8 @@ public class PatientService {
 
     private PatientDetailResponse toPatientDetailResponse(Patient patient) {
         List<PatientDiagnosis> diagnoses = patientDiagnosisRepository.findByPatientOrderByCreatedAtAsc(patient);
-        List<MedicationHistory> medicationHistory = medicationHistoryRepository.findByPatientOrderByCreatedAtAsc(patient);
+        List<MedicationHistory> medicationHistory =
+                medicationHistoryRepository.findByPatientOrderByCreatedAtAsc(patient);
         return patientDetailMapper.toResponse(patient, diagnoses, medicationHistory);
     }
 
