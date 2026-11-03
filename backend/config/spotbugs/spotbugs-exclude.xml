@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter for the backend.
+
+  The build reports only HIGH-priority findings (threshold=High in pom.xml), and the current code has none, so
+  nothing is suppressed yet.
+
+  Do not disable a whole bug category here. When a High finding is a genuine false positive (for example a
+  Lombok-generated accessor), suppress that one case with <Match> on class + bug pattern (+ field or method) and
+  state the reason in a comment placed above the entry, e.g.:
+
+    Reason: why this specific case is safe.
+    <Match>
+      <Class name="com.page24.backend.entity.Example"/>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Field name="items"/>
+    </Match>
+
+  Note: a comment must not contain two consecutive hyphens, and SpotBugs only logs (does not fail) when this file
+  is unreadable, so check the build log for "Unable to read filter" after editing it.
+
+  Known findings that appear only if the threshold is lowered to Medium (not reported today, 14 in total):
+    EI_EXPOSE_REP / EI_EXPOSE_REP2 (7): CarePlanDownload.content, ReportFile.content (byte[] in records),
+      PatientHasActiveOrdersException.activeOrderIds (List), LLMAdapterFactory.llmServices (Spring-injected)
+    CT_CONSTRUCTOR_THROW (3): CreateOrderHandler, GenerateCarePlanHandler, IntakeAdapterFactory
+    VA_FORMAT_STRING_USES_NEWLINE (3): ClaudeService, OpenAIService, DataInitializationService
+    NP_BOOLEAN_RETURN_NULL (1): CreateOrderHandler
+-->
+<FindBugsFilter>
+</FindBugsFilter>

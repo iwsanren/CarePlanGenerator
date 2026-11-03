@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Relaxed starter ruleset for the backend (main sources only).
+
+  Why not sun_checks / google_checks as-is: on this code base they report about 1,960 and 3,640 violations
+  (mostly Javadoc, final parameters, 2-space indentation), which is noise rather than signal. This file keeps only
+  rules that catch real mess and can be fixed mechanically. Add rules here one at a time, fixing the violations
+  they raise in the same change.
+
+  Checkstyle engine: 12.3.1 (13.x needs Java 21, but CI and the Dockerfile build on Java 17).
+  Severity "error" makes `./mvnw verify` fail on any violation.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <module name="FileTabCharacter"/>
+    <module name="NewlineAtEndOfFile"/>
+
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <!-- package/import lines and URLs cannot be wrapped -->
+        <property name="ignorePattern" value="^(package|import) .*|https?://\S+"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- imports -->
+        <module name="AvoidStarImport"/>
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+        <module name="IllegalImport"/>
+
+        <!-- blocks and statements -->
+        <module name="EmptyBlock"/>
+        <module name="NeedBraces"/>
+        <module name="EmptyStatement"/>
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="EqualsHashCode"/>
+
+        <!-- modifiers and literals -->
+        <module name="ModifierOrder"/>
+        <module name="RedundantModifier"/>
+        <module name="UpperEll"/>
+        <module name="ArrayTypeStyle"/>
+
+        <!-- naming (standard Java conventions) -->
+        <module name="PackageName"/>
+        <module name="TypeName"/>
+        <module name="MethodName"/>
+        <module name="ConstantName"/>
+        <module name="MemberName"/>
+        <module name="StaticVariableName"/>
+        <module name="LocalVariableName"/>
+        <module name="ParameterName"/>
+    </module>
+</module>
