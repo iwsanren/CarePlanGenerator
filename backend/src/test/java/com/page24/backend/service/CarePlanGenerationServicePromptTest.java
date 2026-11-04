@@ -76,6 +76,20 @@ class CarePlanGenerationServicePromptTest {
         assertThat(patientInfo).contains("- I10\n- E11.9");
     }
 
+    @Test
+    void rendersBlankAllergiesAndClinicalNotesAsNotDocumented() {
+        Order order = fullOrder();
+        order.getPatient().setAllergies("   ");
+        order.setPatientRecords("");
+
+        String patientInfo = service.buildPatientInfo(order);
+
+        // Whitespace-only text is an information gap too, never an empty "no allergies" line.
+        assertThat(patientInfo)
+                .contains("Allergies: Not documented")
+                .contains("## CLINICAL NOTES\nNot documented");
+    }
+
     private Order fullOrder() {
         Patient patient = new Patient();
         patient.setFirstName("Alice");
