@@ -3,6 +3,7 @@ package com.page24.backend.dto;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -41,6 +42,13 @@ public class UpdatePatientRequest {
 
     @Pattern(regexp = Icd10Codes.REGEX, message = "primary_diagnosis must be a valid ICD-10 code")
     private String primaryDiagnosis;
+
+    /**
+     * Optional description of the primary diagnosis. When the primary diagnosis code changes and this is not sent,
+     * the stored description is cleared, because the old text no longer describes the new code.
+     */
+    @Size(max = 500, message = "primary_diagnosis_description must be at most 500 characters")
+    private String primaryDiagnosisDescription;
 
     private List<
             @Pattern(regexp = Icd10Codes.REGEX, message = "additional_diagnoses must contain valid ICD-10 codes")

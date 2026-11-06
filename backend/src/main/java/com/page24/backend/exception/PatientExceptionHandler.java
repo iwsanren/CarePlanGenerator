@@ -87,6 +87,7 @@ public class PatientExceptionHandler {
     private String toApiFieldName(String fieldName) {
         return fieldName.replace("dateOfBirth", "date_of_birth")
                 .replace("weightKg", "weight_kg")
+                .replace("primaryDiagnosisDescription", "primary_diagnosis_description")
                 .replace("primaryDiagnosis", "primary_diagnosis")
                 .replace("additionalDiagnoses", "additional_diagnoses")
                 .replace("firstName", "first_name")
