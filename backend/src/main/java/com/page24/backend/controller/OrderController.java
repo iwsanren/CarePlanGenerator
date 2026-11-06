@@ -7,6 +7,7 @@ import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.dto.PagedOrderResponse;
 import com.page24.backend.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -83,12 +84,18 @@ public class OrderController {
                 page, pageSize, status, patientId, providerId, patientName));
     }
 
-    @Operation(summary = "Search orders by patient name or MRN")
+    @Operation(summary = "Search orders by patient name or MRN",
+            description = "Filters: patient_name (part of a first or last name, case-insensitive) or mrn; mrn wins "
+                    + "when both are given. patientName is the old spelling of patient_name and is kept for "
+                    + "existing callers; patient_name wins when both are given.")
     @GetMapping("/search")
     public ResponseEntity<List<OrderResponse>> searchOrders(
-            @RequestParam(required = false) String patientName,
+            @RequestParam(name = "patient_name", required = false) String patientName,
+            @Parameter(deprecated = true, description = "Old spelling of patient_name")
+            @RequestParam(name = "patientName", required = false) String legacyPatientName,
             @RequestParam(required = false) String mrn) {
-        return ResponseEntity.ok(orderService.searchOrders(patientName, mrn));
+        String nameToSearch = patientName != null && !patientName.isBlank() ? patientName : legacyPatientName;
+        return ResponseEntity.ok(orderService.searchOrders(nameToSearch, mrn));
     }
 
     @Operation(summary = "Regenerate a care plan",

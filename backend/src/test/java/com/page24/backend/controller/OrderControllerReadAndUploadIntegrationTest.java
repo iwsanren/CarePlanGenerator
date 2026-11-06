@@ -145,16 +145,56 @@ class OrderControllerReadAndUploadIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/orders/search?patientName= - matches part of a first or last name, ignoring case")
+    @DisplayName("GET /api/v1/orders/search?patient_name= - matches part of a first or last name, ignoring case")
     void shouldSearchOrdersByPartOfThePatientName() throws Exception {
         orderWithCarePlan(patient("Alice", "Wong", "100001"), CarePlan.Status.PENDING, null);
         orderWithCarePlan(patient("Bob", "Alison", "100002"), CarePlan.Status.PENDING, null);
         orderWithCarePlan(patient("Cathy", "Chen", "100003"), CarePlan.Status.PENDING, null);
 
-        mockMvc.perform(get("/api/v1/orders/search").param("patientName", "ALI"))
+        mockMvc.perform(get("/api/v1/orders/search").param("patient_name", "ALI"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[*].patientMrn", containsInAnyOrder("100001", "100002")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/orders/search?patientName= - the old camelCase name still works for existing callers")
+    void shouldStillAcceptTheLegacyPatientNameParameter() throws Exception {
+        orderWithCarePlan(patient("Alice", "Wong", "100001"), CarePlan.Status.PENDING, null);
+        orderWithCarePlan(patient("Cathy", "Chen", "100003"), CarePlan.Status.PENDING, null);
+
+        mockMvc.perform(get("/api/v1/orders/search").param("patientName", "ALI"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].patientMrn").value("100001"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/orders/search - patient_name wins when the legacy patientName is sent as well")
+    void shouldPreferPatientNameOverTheLegacyParameter() throws Exception {
+        orderWithCarePlan(patient("Alice", "Wong", "100001"), CarePlan.Status.PENDING, null);
+        orderWithCarePlan(patient("Cathy", "Chen", "100003"), CarePlan.Status.PENDING, null);
+
+        mockMvc.perform(get("/api/v1/orders/search")
+                        .param("patient_name", "Cathy")
+                        .param("patientName", "Alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].patientMrn").value("100003"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/orders/search - a blank patient_name falls back to the legacy parameter")
+    void shouldFallBackToTheLegacyParameterWhenPatientNameIsBlank() throws Exception {
+        orderWithCarePlan(patient("Alice", "Wong", "100001"), CarePlan.Status.PENDING, null);
+        orderWithCarePlan(patient("Cathy", "Chen", "100003"), CarePlan.Status.PENDING, null);
+
+        mockMvc.perform(get("/api/v1/orders/search")
+                        .param("patient_name", "")
+                        .param("patientName", "Cathy"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].patientMrn").value("100003"));
     }
 
     @Test
@@ -163,7 +203,7 @@ class OrderControllerReadAndUploadIntegrationTest {
         orderWithCarePlan(patient("Alice", "Wong", "100001"), CarePlan.Status.PENDING, null);
         orderWithCarePlan(patient("Bob", "Lee", "100002"), CarePlan.Status.PENDING, null);
 
-        mockMvc.perform(get("/api/v1/orders/search").param("mrn", "100002").param("patientName", "Alice"))
+        mockMvc.perform(get("/api/v1/orders/search").param("mrn", "100002").param("patient_name", "Alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].patientMrn").value("100002"));

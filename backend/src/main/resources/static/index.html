@@ -446,7 +446,7 @@
                 if (searchMrn) {
                     url += `mrn=${encodeURIComponent(searchMrn)}`;
                 } else if (searchName) {
-                    url += `patientName=${encodeURIComponent(searchName)}`;
+                    url += `patient_name=${encodeURIComponent(searchName)}`;
                 }
 
                 const response = await fetch(url);

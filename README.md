@@ -284,7 +284,7 @@ GET /api/v1/orders/{id}
 GET /api/v1/orders/{id}/status
 
 # Search orders
-GET /api/v1/orders/search?patientName=John
+GET /api/v1/orders/search?patient_name=John
 GET /api/v1/orders/search?mrn=123456
 
 # Regenerate a completed/failed care plan
