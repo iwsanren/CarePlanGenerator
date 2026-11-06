@@ -130,6 +130,24 @@ public class PatientService {
             throw new PatientMrnModificationException();
         }
 
+        // Changing the name or the date of birth must not turn this patient into a duplicate of another one.
+        // The check runs on the resulting values before anything is changed, and only when one of the three is sent,
+        // so updating unrelated fields still works for a record that already has a duplicate.
+        if (request.getFirstName() != null || request.getLastName() != null || request.getDateOfBirth() != null) {
+            String firstName = request.getFirstName() != null ? request.getFirstName() : patient.getFirstName();
+            String lastName = request.getLastName() != null ? request.getLastName() : patient.getLastName();
+            java.time.LocalDate dateOfBirth =
+                    request.getDateOfBirth() != null ? request.getDateOfBirth() : patient.getDateOfBirth();
+            patientRepository.findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndIdNot(
+                            firstName, lastName, dateOfBirth, id)
+                    .ifPresent(existingPatient -> {
+                        throw new PatientDuplicateException(
+                                "A patient with the same name and date of birth already exists",
+                                existingPatient.getId()
+                        );
+                    });
+        }
+
         if (request.getFirstName() != null) {
             patient.setFirstName(request.getFirstName());
         }
@@ -148,8 +166,16 @@ public class PatientService {
         if (request.getAllergies() != null) {
             patient.setAllergies(request.getAllergies());
         }
+        boolean primaryDiagnosisChanged = request.getPrimaryDiagnosis() != null
+                && !request.getPrimaryDiagnosis().equals(patient.getPrimaryDiagnosis());
         if (request.getPrimaryDiagnosis() != null) {
             patient.setPrimaryDiagnosis(request.getPrimaryDiagnosis());
+        }
+        if (request.getPrimaryDiagnosisDescription() != null) {
+            patient.setPrimaryDiagnosisDescription(request.getPrimaryDiagnosisDescription());
+        } else if (primaryDiagnosisChanged) {
+            // The old description belongs to the old code, so it must not stay attached to the new one.
+            patient.setPrimaryDiagnosisDescription(null);
         }
         if (request.getAdditionalDiagnoses() != null) {
             patient.setAdditionalDiagnoses(new ArrayList<>(request.getAdditionalDiagnoses()));

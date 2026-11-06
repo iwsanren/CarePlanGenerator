@@ -25,5 +25,13 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     );
 
     List<Patient> findByFirstNameIgnoreCaseAndLastNameIgnoreCase(String firstName, String lastName);
+
+    /** Same lookup as above, but ignoring one patient: used when updating, so a patient is not its own duplicate. */
+    Optional<Patient> findFirstByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndIdNot(
+            String firstName,
+            String lastName,
+            java.time.LocalDate dateOfBirth,
+            Long id
+    );
 }
 
