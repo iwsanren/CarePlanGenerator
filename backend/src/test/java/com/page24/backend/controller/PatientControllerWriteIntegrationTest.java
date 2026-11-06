@@ -196,13 +196,66 @@ class PatientControllerWriteIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/patients/{id} - only the primary diagnosis changes when only it is sent")
-    void shouldUpdateOnlyThePrimaryDiagnosis() throws Exception {
+    @DisplayName("PUT /api/v1/patients/{id} - changing the primary diagnosis alone clears its old description")
+    void shouldClearTheDescriptionWhenOnlyThePrimaryDiagnosisChanges() throws Exception {
         updateOk(john.getId(), """
                 { "primaryDiagnosis": "E11.9" }
                 """);
 
-        assertOnlyChanged("primaryDiagnosis", "E11.9");
+        // The old text describes G70.00, so it must not stay attached to E11.9; nothing else changes.
+        assertStoredWith(expected -> {
+            expected.put("primaryDiagnosis", "E11.9");
+            expected.put("primaryDiagnosisDescription", null);
+        });
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - a new primary diagnosis and its description are saved together")
+    void shouldSaveTheNewPrimaryDiagnosisTogetherWithItsDescription() throws Exception {
+        updateOk(john.getId(), """
+                { "primaryDiagnosis": "E11.9", "primaryDiagnosisDescription": "Type 2 diabetes mellitus" }
+                """);
+
+        assertStoredWith(expected -> {
+            expected.put("primaryDiagnosis", "E11.9");
+            expected.put("primaryDiagnosisDescription", "Type 2 diabetes mellitus");
+        });
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - a description alone updates the description and keeps the diagnosis")
+    void shouldUpdateOnlyTheDescription() throws Exception {
+        updateOk(john.getId(), """
+                { "primaryDiagnosisDescription": "Myasthenia gravis, stable" }
+                """);
+
+        assertOnlyChanged("primaryDiagnosisDescription", "Myasthenia gravis, stable");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - sending the current diagnosis again keeps its description")
+    void shouldKeepTheDescriptionWhenTheSameDiagnosisIsSentAgain() throws Exception {
+        updateOk(john.getId(), """
+                { "primaryDiagnosis": "G70.00", "weightKg": 80 }
+                """);
+
+        assertOnlyChanged("weightKg", 80.0);
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - a description over 500 characters returns 400 and stores nothing")
+    void shouldRejectATooLongDescription() throws Exception {
+        mockMvc.perform(put("/api/v1/patients/{id}", john.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "primaryDiagnosis": "E11.9", "primaryDiagnosisDescription": "%s" }
+                                """.formatted("x".repeat(501))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.details.primary_diagnosis_description")
+                        .value("primary_diagnosis_description must be at most 500 characters"));
+
+        assertThat(stored(john.getId())).isEqualTo(johnBefore);
     }
 
     @Test
@@ -241,6 +294,120 @@ class PatientControllerWriteIntegrationTest {
         updateOk(john.getId(), "{}");
 
         assertThat(stored(john.getId())).isEqualTo(johnBefore);
+    }
+
+    // ----- PUT: a changed name or date of birth must not create a duplicate -----
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - becoming the same name and date of birth as another patient returns 409")
+    void shouldRejectAnUpdateThatMakesThePatientADuplicate() throws Exception {
+        Patient jane = savePatient("Jane", "Doe", "002000", LocalDate.of(1990, 1, 1));
+        Map<String, Object> janeBefore = stored(jane.getId());
+
+        mockMvc.perform(put("/api/v1/patients/{id}", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "John", "lastName": "Smith", "dateOfBirth": "1979-06-08",
+                                  "weightKg": 99 }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.warning").value("A patient with the same name and date of birth already exists"))
+                .andExpect(jsonPath("$.existing_patient_id").value(john.getId()));
+
+        // Nothing from the rejected request is stored, not even the weight sent with it.
+        assertThat(stored(jane.getId())).isEqualTo(janeBefore);
+        assertThat(stored(john.getId())).isEqualTo(johnBefore);
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - changing only the date of birth to match a same-named patient returns 409")
+    void shouldRejectAnUpdateOfOnlyTheDateOfBirthThatCreatesADuplicate() throws Exception {
+        Patient otherJohn = savePatient("John", "Smith", "002000", LocalDate.of(1985, 5, 5));
+        Map<String, Object> before = stored(otherJohn.getId());
+
+        mockMvc.perform(put("/api/v1/patients/{id}", otherJohn.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "dateOfBirth": "1979-06-08" }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.existing_patient_id").value(john.getId()));
+
+        assertThat(stored(otherJohn.getId())).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - changing only the name to match a patient with the same date of birth returns 409")
+    void shouldRejectAnUpdateOfOnlyTheNameThatCreatesADuplicate() throws Exception {
+        Patient mary = savePatient("Mary", "Lee", "002000", LocalDate.of(1979, 6, 8));
+        Map<String, Object> before = stored(mary.getId());
+
+        mockMvc.perform(put("/api/v1/patients/{id}", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "John", "lastName": "Smith" }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.existing_patient_id").value(john.getId()));
+
+        assertThat(stored(mary.getId())).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - the duplicate check ignores the case of the name")
+    void shouldTreatTheNameAsCaseInsensitiveWhenCheckingAnUpdate() throws Exception {
+        Patient jane = savePatient("Jane", "Doe", "002000", LocalDate.of(1979, 6, 8));
+
+        mockMvc.perform(put("/api/v1/patients/{id}", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "john", "lastName": "SMITH" }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.existing_patient_id").value(john.getId()));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - the same name with a different date of birth is allowed")
+    void shouldAllowAnUpdateToTheSameNameWithADifferentDateOfBirth() throws Exception {
+        Patient jane = savePatient("Jane", "Doe", "002000", LocalDate.of(1990, 1, 1));
+
+        mockMvc.perform(put("/api/v1/patients/{id}", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "John", "lastName": "Smith" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Smith"));
+
+        assertThat(stored(jane.getId())).containsEntry("firstName", "John").containsEntry("lastName", "Smith");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - sending the patient's own name and date of birth is not a duplicate")
+    void shouldNotTreatThePatientAsItsOwnDuplicate() throws Exception {
+        updateOk(john.getId(), """
+                { "firstName": "John", "lastName": "Smith", "dateOfBirth": "1979-06-08", "sex": "Male" }
+                """);
+
+        assertOnlyChanged("sex", "Male");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/patients/{id} - fields other than name and date of birth skip the check, even for an existing duplicate")
+    void shouldNotBlockUnrelatedUpdatesOfAnAlreadyDuplicatedRecord() throws Exception {
+        Patient legacyTwin = savePatient("John", "Smith", "007777", LocalDate.of(1979, 6, 8));
+
+        mockMvc.perform(put("/api/v1/patients/{id}", legacyTwin.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "weightKg": 80 }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weightKg").value(80.0));
+
+        assertThat(stored(legacyTwin.getId())).containsEntry("weightKg", 80.0);
     }
 
     // ----- PUT: validation and errors -----
@@ -325,11 +492,29 @@ class PatientControllerWriteIntegrationTest {
                 .andExpect(jsonPath("$.updatedAt").exists());
     }
 
+    /** The stored patient must equal the original except for the fields changed by {@code changes}. */
+    private void assertStoredWith(java.util.function.Consumer<Map<String, Object>> changes) {
+        Map<String, Object> expected = new HashMap<>(johnBefore);
+        changes.accept(expected);
+        assertThat(stored(john.getId())).isEqualTo(expected);
+    }
+
     /** The stored patient must equal the original except for one field. */
     private void assertOnlyChanged(String field, Object newValue) {
         Map<String, Object> expected = new HashMap<>(johnBefore);
         expected.put(field, newValue);
         assertThat(stored(john.getId())).isEqualTo(expected);
+    }
+
+    private Patient savePatient(String firstName, String lastName, String mrn, LocalDate dateOfBirth) {
+        Patient patient = new Patient();
+        patient.setFirstName(firstName);
+        patient.setLastName(lastName);
+        patient.setMrn(mrn);
+        patient.setDateOfBirth(dateOfBirth);
+        patient.setPrimaryDiagnosis("G70.00");
+        patient.setAdditionalDiagnoses(new ArrayList<>());
+        return patientRepository.saveAndFlush(patient);
     }
 
     /** Reads the patient in its own transaction, so the result comes from the database and not from a cache. */
