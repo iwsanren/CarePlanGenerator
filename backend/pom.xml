@@ -33,11 +33,12 @@
             jacoco-maven-plugin configuration. Each value is the measured coverage rounded down to a multiple of
             5 percentage points. History: 2026-11-03 line 80.94% / branch 69.73% gave 80 / 65; after test rounds
             1 to 4 (2026-11-05) line 86.15% / branch 79.69% gives 85 / 75; after test rounds 5 to 8 (2026-11-08)
-            line 88.56% / branch 87.19% gives 85 / 85. To tighten the gate, edit only these two
+            line 88.56% / branch 87.19% gives 85 / 85; after test round 10 (2026-11-09) line 91.41% / branch
+            91.23% gives 90 / 90. To tighten the gate, edit only these two
             values (0.85 = 85%) and update the threshold table in docs/COVERAGE_BASELINE.md.
         -->
-        <jacoco.line.minimum>0.85</jacoco.line.minimum>
-        <jacoco.branch.minimum>0.85</jacoco.branch.minimum>
+        <jacoco.line.minimum>0.90</jacoco.line.minimum>
+        <jacoco.branch.minimum>0.90</jacoco.branch.minimum>
     </properties>
     <dependencies>
         <dependency>
