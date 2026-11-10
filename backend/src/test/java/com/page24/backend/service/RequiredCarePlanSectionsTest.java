@@ -3,6 +3,8 @@ package com.page24.backend.service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -34,14 +36,16 @@ class RequiredCarePlanSectionsTest {
     @Test
     @DisplayName("ClaudeService prompt instructs the model to produce all four required sections")
     void claudePromptRequestsAllRequiredSections() {
-        ClaudeService service = new ClaudeService("test-key", "https://example.invalid/messages", "test-model");
+        ClaudeService service =
+                new ClaudeService("test-key", "https://example.invalid/messages", "test-model", Duration.ofSeconds(60));
         assertContainsAllRequiredSections(service.buildPrompt("irrelevant for this check"));
     }
 
     @Test
     @DisplayName("OpenAIService prompt instructs the model to produce all four required sections")
     void openAiPromptRequestsAllRequiredSections() {
-        OpenAIService service = new OpenAIService("test-key", "https://example.invalid/chat", "test-model");
+        OpenAIService service =
+                new OpenAIService("test-key", "https://example.invalid/chat", "test-model", Duration.ofSeconds(60));
         assertContainsAllRequiredSections(service.buildPrompt("irrelevant for this check"));
     }
 

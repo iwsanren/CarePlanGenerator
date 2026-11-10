@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A stand-in for an LLM provider's HTTP API, built on the JDK's own {@link HttpServer} so the tests need no extra
@@ -30,8 +32,11 @@ final class FakeLlmApiServer implements AutoCloseable {
 
     private final HttpServer server;
     private final List<RecordedRequest> requests = new CopyOnWriteArrayList<>();
+    /** Released when the server closes, so a request that is being held back does not outlive the test. */
+    private final CountDownLatch closed = new CountDownLatch(1);
     private volatile int status = 200;
     private volatile String body = "{}";
+    private volatile long delayMillis;
 
     private FakeLlmApiServer(HttpServer server) {
         this.server = server;
@@ -60,6 +65,12 @@ final class FakeLlmApiServer implements AutoCloseable {
 
     /** Every later request is answered with this status and body (an empty body is sent with no content). */
     void respondWith(int responseStatus, String responseBody) {
+        respondAfter(0, responseStatus, responseBody);
+    }
+
+    /** Like {@link #respondWith}, but each answer is held back for the given time, as a slow provider would. */
+    void respondAfter(long delayInMillis, int responseStatus, String responseBody) {
+        this.delayMillis = delayInMillis;
         this.status = responseStatus;
         this.body = responseBody;
     }
@@ -84,6 +95,8 @@ final class FakeLlmApiServer implements AutoCloseable {
             requests.add(new RecordedRequest(
                     exchange.getRequestMethod(), exchange.getRequestURI().getPath(), headers, requestBody));
 
+            holdBack();
+
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             if (payload.length == 0) {
@@ -95,8 +108,22 @@ final class FakeLlmApiServer implements AutoCloseable {
         }
     }
 
+    /** Waits for the configured delay, or until the server is closed, whichever comes first. */
+    private void holdBack() {
+        long delay = delayMillis;
+        if (delay <= 0) {
+            return;
+        }
+        try {
+            closed.await(delay, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Override
     public void close() {
+        closed.countDown();
         server.stop(0);
     }
 }

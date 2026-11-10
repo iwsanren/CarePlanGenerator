@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,14 +22,17 @@ public class ClaudeService implements BaseLLMService {
 
     private final String apiKey;
     private final String model;
+    private final Duration requestTimeout;
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ClaudeService(@Value("${llm.claude.api.key:}") String apiKey,
                          @Value("${llm.claude.api.url:https://api.anthropic.com/v1/messages}") String apiUrl,
-                         @Value("${llm.claude.model:claude-3-5-sonnet-latest}") String model) {
+                         @Value("${llm.claude.model:claude-3-5-sonnet-latest}") String model,
+                         @Value("${llm.request-timeout:60s}") Duration requestTimeout) {
         this.apiKey = apiKey;
         this.model = model;
+        this.requestTimeout = requestTimeout;
         this.webClient = WebClient.builder().baseUrl(apiUrl).build();
     }
 
@@ -55,6 +59,9 @@ public class ClaudeService implements BaseLLMService {
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
+                    // Bounds the whole call. Without it a provider that accepts the connection and never answers
+                    // would block this thread for good, and the retry in the caller would never get its turn.
+                    .timeout(requestTimeout)
                     .block();
 
             JsonNode jsonNode = objectMapper.readTree(response);

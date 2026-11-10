@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,14 +21,17 @@ public class OpenAIService implements BaseLLMService {
 
     private final String apiKey;
     private final String model;
+    private final Duration requestTimeout;
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OpenAIService(@Value("${llm.api.key}") String apiKey,
                          @Value("${llm.api.url}") String apiUrl,
-                         @Value("${llm.openai.model:gpt-3.5-turbo}") String model) {
+                         @Value("${llm.openai.model:gpt-3.5-turbo}") String model,
+                         @Value("${llm.request-timeout:60s}") Duration requestTimeout) {
         this.apiKey = apiKey;
         this.model = model;
+        this.requestTimeout = requestTimeout;
         this.webClient = WebClient.builder().baseUrl(apiUrl).build();
     }
 
@@ -51,6 +55,9 @@ public class OpenAIService implements BaseLLMService {
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
+                    // Bounds the whole call. Without it a provider that accepts the connection and never answers
+                    // would block this thread for good, and the retry in the caller would never get its turn.
+                    .timeout(requestTimeout)
                     .block();
 
             JsonNode jsonNode = objectMapper.readTree(response);

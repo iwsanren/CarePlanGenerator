@@ -13,6 +13,8 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +44,7 @@ class OpenAIServiceTest {
     }
 
     private OpenAIService service() {
-        return new OpenAIService(API_KEY, server.url(PATH), "test-model");
+        return new OpenAIService(API_KEY, server.url(PATH), "test-model", Duration.ofSeconds(30));
     }
 
     private static String reply(String content) {
@@ -181,11 +183,38 @@ class OpenAIServiceTest {
         try (FakeLlmApiServer closed = FakeLlmApiServer.start()) {
             deadUrl = closed.url(PATH);
         }
-        OpenAIService service = new OpenAIService(API_KEY, deadUrl, "test-model");
+        OpenAIService service = new OpenAIService(API_KEY, deadUrl, "test-model", Duration.ofSeconds(30));
 
         assertThatThrownBy(() -> service.generateCarePlan(PATIENT_INFO))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage(WRAPPED_MESSAGE)
                 .hasCauseInstanceOf(WebClientRequestException.class);
+    }
+
+    @Test
+    @DisplayName("A provider that answers too slowly is given up on at the timeout, as a wrapped timeout error")
+    void givesUpOnAProviderThatAnswersTooSlowly() {
+        // The reply would arrive after 10 seconds; the service is only willing to wait 300 milliseconds.
+        server.respondAfter(10_000, 200, reply("too late"));
+        OpenAIService service = new OpenAIService(API_KEY, server.url(PATH), "test-model", Duration.ofMillis(300));
+
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> service.generateCarePlan(PATIENT_INFO))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage(WRAPPED_MESSAGE)
+                .hasRootCauseInstanceOf(TimeoutException.class);
+        Duration waited = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(waited).as("returned at the timeout, not when the provider finally answered")
+                .isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    @DisplayName("A reply that arrives within the timeout is returned as usual")
+    void returnsAReplyThatArrivesWithinTheTimeout() {
+        server.respondAfter(100, 200, reply("in time"));
+        OpenAIService service = new OpenAIService(API_KEY, server.url(PATH), "test-model", Duration.ofSeconds(10));
+
+        assertThat(service.generateCarePlan(PATIENT_INFO)).isEqualTo("in time");
     }
 }
