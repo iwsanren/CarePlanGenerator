@@ -230,6 +230,19 @@ class IntakeControllerIntegrationTest {
         assertNothingWasCreated();
     }
 
+    @Test
+    @DisplayName("clinic-b - a date of birth that does not exist (02/30) returns 400 instead of being moved to 02/28")
+    void clinicBWithANonExistentDateOfBirthIsABadRequest() throws Exception {
+        String json = clinicJson("IVIG", "1111111111", "123456", "G70.00").replace("03/22/1985", "02/30/1985");
+
+        mockMvc.perform(post("/api/v1/intake/clinic-b").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_OF_BIRTH"))
+                .andExpect(jsonPath("$.detail.field").value("pt.dob"));
+
+        assertNothingWasCreated();
+    }
+
     private void assertNothingWasCreated() {
         assertThat(orderRepository.count()).as("no order is saved for a rejected request").isZero();
         verify(queueService, never()).enqueue(anyLong());

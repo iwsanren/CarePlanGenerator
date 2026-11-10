@@ -220,7 +220,8 @@ class ClinicBAdapterTest {
     }
 
     @ParameterizedTest(name = "[{index}] date of birth \"{0}\"")
-    @ValueSource(strings = {"1985-03-22", "22/03/1985", "13/01/2020", "3/22/1985", "03-22-1985", "not a date"})
+    @ValueSource(strings = {"1985-03-22", "22/03/1985", "13/01/2020", "3/22/1985", "03-22-1985", "not a date",
+            "02/30/1985", "02/31/1985", "04/31/1985", "02/29/1985"})
     @DisplayName("transform refuses a date of birth that is not MM/dd/yyyy as a bad request, not a server error")
     void refusesADateOfBirthInTheWrongFormat(String dateOfBirth) {
         ClinicBAdapter.ClinicBPayload payload = adapter.parse(JSON.replace("03/22/1985", dateOfBirth));

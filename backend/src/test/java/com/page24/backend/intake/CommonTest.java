@@ -41,6 +41,28 @@ class CommonTest {
         assertThatThrownBy(() -> Common.parseUsDate(text)).isInstanceOf(DateTimeParseException.class);
     }
 
+    @ParameterizedTest(name = "\"{0}\" is rejected, not moved to another day")
+    @ValueSource(strings = {"02/30/2020", "02/31/2021", "04/31/2020", "06/31/2019", "09/31/2018", "11/31/2017",
+            "02/29/2021", "02/29/1900"})
+    @DisplayName("parseUsDate rejects a day the month does not have instead of silently moving it to a real date")
+    void rejectsADayThatTheMonthDoesNotHave(String text) {
+        assertThatThrownBy(() -> Common.parseUsDate(text)).isInstanceOf(DateTimeParseException.class);
+    }
+
+    @ParameterizedTest(name = "\"{0}\" is accepted")
+    @ValueSource(strings = {"02/29/2020", "02/29/2000", "02/28/2021", "04/30/2020", "12/31/1999"})
+    @DisplayName("parseUsDate still accepts the last day of a month, including 29 February in a leap year")
+    void acceptsTheLastDayOfAMonth(String text) {
+        assertThat(Common.parseUsDate(text)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("parseUsDate keeps the date it was given for a leap day")
+    void keepsALeapDay() {
+        assertThat(Common.parseUsDate("02/29/2020")).isEqualTo(LocalDate.of(2020, 2, 29));
+        assertThat(Common.parseUsDate("04/30/2020")).isEqualTo(LocalDate.of(2020, 4, 30));
+    }
+
     // ------------------------------------------------------------- safeList
 
     @Test

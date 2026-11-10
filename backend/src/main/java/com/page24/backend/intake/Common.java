@@ -7,6 +7,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,10 @@ public final class Common {
     private Common() {
     }
 
-    static final DateTimeFormatter US_DATE = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+    // STRICT, with "uuuu" (a plain year): the default SMART resolver quietly turns 02/30 into 02/28 and 04/31 into
+    // 04/30, so a date of birth that does not exist would be stored as a different, real one.
+    static final DateTimeFormatter US_DATE = DateTimeFormatter.ofPattern("MM/dd/uuuu")
+            .withResolverStyle(ResolverStyle.STRICT);
 
     public static LocalDate parseUsDate(String dateText) {
         if (dateText == null || dateText.isBlank()) {
