@@ -60,7 +60,12 @@ public class ClaudeService implements BaseLLMService {
             JsonNode jsonNode = objectMapper.readTree(response);
             JsonNode contentNode = jsonNode.get("content");
             if (contentNode != null && contentNode.isArray() && !contentNode.isEmpty()) {
-                return contentNode.get(0).get("text").asText();
+                // Only a non-blank string counts as a care plan. asText() would turn a JSON null into the
+                // text "null" and keep an empty string, and either would be saved as a completed plan.
+                JsonNode textNode = contentNode.get(0).get("text");
+                if (textNode != null && textNode.isTextual() && !textNode.asText().isBlank()) {
+                    return textNode.asText();
+                }
             }
             throw new RuntimeException("Claude response format is unexpected: missing content[0].text");
         } catch (Exception e) {

@@ -110,9 +110,16 @@ class OpenAIServiceTest {
             "{\"choices\":[]}",
             "{\"choices\":[{}]}",
             "{\"choices\":[{\"message\":{}}]}",
-            "{\"choices\":[{\"message\":null}]}"
+            "{\"choices\":[{\"message\":null}]}",
+            "{\"choices\":[null]}",
+            "{\"choices\":\"just text\"}",
+            "{\"choices\":[{\"message\":{\"content\":null}}]}",
+            "{\"choices\":[{\"message\":{\"content\":\"\"}}]}",
+            "{\"choices\":[{\"message\":{\"content\":\"   \"}}]}",
+            "{\"choices\":[{\"message\":{\"content\":42}}]}",
+            "{\"choices\":[{\"message\":{\"content\":{\"a\":1}}}]}"
     })
-    @DisplayName("A reply without choices[0].message.content fails as a wrapped error")
+    @DisplayName("A reply without usable choices[0].message.content is not accepted as a care plan")
     void failsOnAnUnexpectedFormat(String reply) {
         server.respondWith(200, reply);
         OpenAIService service = service();
@@ -120,7 +127,7 @@ class OpenAIServiceTest {
         assertThatThrownBy(() -> service.generateCarePlan(PATIENT_INFO))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage(WRAPPED_MESSAGE)
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasRootCauseMessage("OpenAI response format is unexpected: missing choices[0].message.content");
     }
 
     @Test

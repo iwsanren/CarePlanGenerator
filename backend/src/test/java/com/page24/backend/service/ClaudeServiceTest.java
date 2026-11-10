@@ -131,16 +131,27 @@ class ClaudeServiceTest {
                 .hasRootCauseMessage("Claude response format is unexpected: missing content[0].text");
     }
 
-    @Test
-    @DisplayName("A first content block that has no text field fails as a wrapped error")
-    void failsWhenTheFirstBlockHasNoText() {
-        server.respondWith(200, "{\"content\":[{\"type\":\"tool_use\"}]}");
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {
+            "{\"content\":[{\"type\":\"tool_use\"}]}",
+            "{\"content\":[{\"type\":\"text\"}]}",
+            "{\"content\":[{\"type\":\"text\",\"text\":null}]}",
+            "{\"content\":[{\"type\":\"text\",\"text\":\"\"}]}",
+            "{\"content\":[{\"type\":\"text\",\"text\":\"   \"}]}",
+            "{\"content\":[{\"type\":\"text\",\"text\":42}]}",
+            "{\"content\":[{\"type\":\"text\",\"text\":{\"a\":1}}]}",
+            "{\"content\":[\"just a string\"]}",
+            "{\"content\":[null]}"
+    })
+    @DisplayName("A first content block whose text is missing, null, blank or not a string is not accepted as a care plan")
+    void rejectsAFirstBlockWithoutUsableText(String reply) {
+        server.respondWith(200, reply);
         ClaudeService service = service();
 
         assertThatThrownBy(() -> service.generateCarePlan(PATIENT_INFO))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage(WRAPPED_MESSAGE)
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasRootCauseMessage("Claude response format is unexpected: missing content[0].text");
     }
 
     @Test

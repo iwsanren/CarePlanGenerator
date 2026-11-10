@@ -54,7 +54,14 @@ public class OpenAIService implements BaseLLMService {
                     .block();
 
             JsonNode jsonNode = objectMapper.readTree(response);
-            return jsonNode.get("choices").get(0).get("message").get("content").asText();
+            // path() never returns null, so a missing level ends as a missing node instead of a NullPointerException.
+            // Only a non-blank string counts as a care plan: asText() would turn a JSON null into the text "null"
+            // and keep an empty string, and either would be saved as a completed plan.
+            JsonNode contentNode = jsonNode.path("choices").path(0).path("message").path("content");
+            if (contentNode.isTextual() && !contentNode.asText().isBlank()) {
+                return contentNode.asText();
+            }
+            throw new RuntimeException("OpenAI response format is unexpected: missing choices[0].message.content");
         } catch (Exception e) {
             log.error("OpenAI 调用失败: {}", e.getMessage());
             throw new RuntimeException("OpenAI failed to generate care plan", e);
