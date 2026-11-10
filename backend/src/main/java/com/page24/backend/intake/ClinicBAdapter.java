@@ -10,6 +10,8 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +63,7 @@ public class ClinicBAdapter implements BaseIntakeAdapter<ClinicBAdapter.ClinicBP
             patient.setFirstName(sourceDto.getPt().getFname());
             patient.setLastName(sourceDto.getPt().getLname());
             patient.setMrn(sourceDto.getPt().getMrn());
-            patient.setDateOfBirth(Common.parseUsDate(sourceDto.getPt().getDob()));
+            patient.setDateOfBirth(parseDateOfBirth(sourceDto.getPt().getDob()));
         }
         order.setPatient(patient);
 
@@ -86,6 +88,14 @@ public class ClinicBAdapter implements BaseIntakeAdapter<ClinicBAdapter.ClinicBP
         order.setDiagnosis(diagnosis);
 
         return order;
+    }
+
+    private static LocalDate parseDateOfBirth(String dob) {
+        try {
+            return Common.parseUsDate(dob);
+        } catch (DateTimeParseException e) {
+            throw Common.invalidDateOfBirth("pt.dob", "MM/dd/yyyy");
+        }
     }
 
     @Override

@@ -5,8 +5,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -164,5 +166,21 @@ class PharmaCorpTest {
         assertThat(pharmaCorp.toCreateOrderRequest(payload, null).getConfirm()).isFalse();
         assertThat(pharmaCorp.toCreateOrderRequest(payload, false).getConfirm()).isFalse();
         assertThat(pharmaCorp.toCreateOrderRequest(payload, true).getConfirm()).isTrue();
+    }
+
+    @ParameterizedTest(name = "[{index}] date of birth \"{0}\"")
+    @ValueSource(strings = {"15-01-1990", "1990/01/15", "01/15/1990", "not a date", "1990-13-01", "1990-02-30"})
+    @DisplayName("A date of birth that is not a real yyyy-MM-dd date is refused as a bad request, not a server error")
+    void refusesADateOfBirthThatIsNotARealIsoDate(String dateOfBirth) {
+        String xml = XML.replace("1972-11-30", dateOfBirth);
+
+        assertThatThrownBy(() -> pharmaCorp.parseInput(xml))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("INVALID_DATE_OF_BIRTH");
+                    assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).isEqualTo("Date of birth must be a real date in the format yyyy-MM-dd");
+                    assertThat(ex.getDetail())
+                            .isEqualTo(Map.of("field", "DateOfBirth", "expectedFormat", "yyyy-MM-dd"));
+                });
     }
 }

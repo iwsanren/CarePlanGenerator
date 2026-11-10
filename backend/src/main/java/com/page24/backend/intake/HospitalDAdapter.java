@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,15 +36,24 @@ public class HospitalDAdapter implements BaseIntakeAdapter<HospitalDAdapter.Hosp
 
     @Override
     public HospitalDPayload parse(String rawPayload) throws IntakeParseException {
-        List<String> nonEmptyLines = rawPayload.lines()
-                .map(String::trim)
-                .filter(line -> !line.isEmpty())
-                .toList();
+        List<String> nonEmptyLines = rawPayload == null
+                ? List.of()
+                : rawPayload.lines()
+                        .map(String::trim)
+                        .filter(line -> !line.isEmpty())
+                        .toList();
+        if (nonEmptyLines.isEmpty()) {
+            throw new IntakeParseException("INVALID_HOSPITAL_D_CSV", "Hospital D payload is required");
+        }
 
         String headerLine;
         String dataLine;
 
         if (nonEmptyLines.get(0).toLowerCase().contains("source_system")) {
+            if (nonEmptyLines.size() < 2) {
+                throw new IntakeParseException("INVALID_HOSPITAL_D_CSV",
+                        "Hospital D CSV has a header but no data row");
+            }
             headerLine = nonEmptyLines.get(0);
             dataLine = nonEmptyLines.get(1);
         } else {
@@ -112,8 +122,17 @@ public class HospitalDAdapter implements BaseIntakeAdapter<HospitalDAdapter.Hosp
         }
     }
 
+    // A missing date is left empty so that validate() reports it the same way as for the other sources; a date
+    // that is present but not a real yyyyMMdd date is a bad request.
     private LocalDate parseHospitalDate(String value) {
-        return LocalDate.parse(value, HOSPITAL_D_DATE);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value, HOSPITAL_D_DATE);
+        } catch (DateTimeParseException e) {
+            throw Common.invalidDateOfBirth("pt_dob_yyyymmdd", "yyyyMMdd");
+        }
     }
 
     private List<String> splitByPipe(String value) {

@@ -20,10 +20,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -156,6 +160,79 @@ class IntakeControllerIntegrationTest {
                         .content(pharmaXml(medication, "1111111111", "999999", "G70.00")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resultType").value("WARNING"));
+    }
+
+    @Test
+    @DisplayName("hospital-d - a header row with no data row returns 400, not 500")
+    void hospitalDWithOnlyAHeaderIsABadRequest() throws Exception {
+        String headerOnly = hospitalDCsv("Privigen", "1122334455", "456789", "G70.00").lines().findFirst().orElseThrow();
+
+        mockMvc.perform(post("/api/v1/intake/hospital-d").contentType("text/csv").content(headerOnly))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("validation"))
+                .andExpect(jsonPath("$.code").value("INVALID_HOSPITAL_D_CSV"))
+                .andExpect(jsonPath("$.httpStatus").value(400));
+
+        assertNothingWasCreated();
+    }
+
+    @Test
+    @DisplayName("hospital-d - a date of birth that is not yyyyMMdd returns 400, not 500")
+    void hospitalDWithABadDateOfBirthIsABadRequest() throws Exception {
+        String csv = hospitalDCsv("Privigen", "1122334455", "456789", "G70.00").replace("19910417", "17-04-1991");
+
+        mockMvc.perform(post("/api/v1/intake/hospital-d").contentType("text/csv").content(csv))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_OF_BIRTH"))
+                .andExpect(jsonPath("$.detail.field").value("pt_dob_yyyymmdd"))
+                .andExpect(jsonPath("$.detail.expectedFormat").value("yyyyMMdd"));
+
+        assertNothingWasCreated();
+    }
+
+    @Test
+    @DisplayName("hospital-d - a missing date of birth returns 400 naming the field, not 500")
+    void hospitalDWithoutADateOfBirthIsABadRequest() throws Exception {
+        String csv = hospitalDCsv("Privigen", "1122334455", "456789", "G70.00").replace("19910417", "");
+
+        mockMvc.perform(post("/api/v1/intake/hospital-d").contentType("text/csv").content(csv))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("patient.dateOfBirth is required")));
+
+        assertNothingWasCreated();
+    }
+
+    @Test
+    @DisplayName("pharma-corp - a date of birth that is not yyyy-MM-dd returns 400, not 500")
+    void pharmaCorpWithABadDateOfBirthIsABadRequest() throws Exception {
+        String xml = pharmaXml("Octagam", "5678901234", "345678", "G70.01").replace("1985-03-22", "22-03-1985");
+
+        mockMvc.perform(post("/api/v1/intake/pharma-corp").contentType(MediaType.APPLICATION_XML).content(xml))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_OF_BIRTH"))
+                .andExpect(jsonPath("$.detail.field").value("DateOfBirth"))
+                .andExpect(jsonPath("$.detail.expectedFormat").value("yyyy-MM-dd"));
+
+        assertNothingWasCreated();
+    }
+
+    @Test
+    @DisplayName("clinic-b - a date of birth that is not MM/dd/yyyy returns 400, not 500")
+    void clinicBWithABadDateOfBirthIsABadRequest() throws Exception {
+        String json = clinicJson("IVIG", "1111111111", "123456", "G70.00").replace("03/22/1985", "1985-03-22");
+
+        mockMvc.perform(post("/api/v1/intake/clinic-b").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_OF_BIRTH"))
+                .andExpect(jsonPath("$.detail.field").value("pt.dob"))
+                .andExpect(jsonPath("$.detail.expectedFormat").value("MM/dd/yyyy"));
+
+        assertNothingWasCreated();
+    }
+
+    private void assertNothingWasCreated() {
+        assertThat(orderRepository.count()).as("no order is saved for a rejected request").isZero();
+        verify(queueService, never()).enqueue(anyLong());
     }
 
     private String clinicJson(String medicationName, String npi, String mrn, String primaryDx) {

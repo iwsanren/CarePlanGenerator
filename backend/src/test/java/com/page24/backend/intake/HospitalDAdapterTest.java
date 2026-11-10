@@ -7,9 +7,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -46,6 +51,72 @@ class HospitalDAdapterTest {
     @DisplayName("The adapter registers itself under the source name used in the URL")
     void sourceIsHospitalD() {
         assertThat(adapter.source()).isEqualTo("hospital-d");
+    }
+
+    // ------------------------------------------------------ unusable input: a bad request, not a server error
+
+    @ParameterizedTest(name = "[{index}] payload \"{0}\"")
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "\n\n", " \r\n \r\n"})
+    @DisplayName("parse refuses a payload with no content at all")
+    void refusesAPayloadWithNoContent(String payload) {
+        assertThatThrownBy(() -> adapter.parse(payload))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("INVALID_HOSPITAL_D_CSV");
+                    assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).isEqualTo("Hospital D payload is required");
+                });
+    }
+
+    @ParameterizedTest(name = "[{index}] payload \"{0}\"")
+    @ValueSource(strings = {HEADER, HEADER + "\n", "\n" + HEADER + "\n\n", "Source_System,pt_id"})
+    @DisplayName("parse refuses a header line that is not followed by a data row")
+    void refusesAHeaderWithoutADataRow(String payload) {
+        assertThatThrownBy(() -> adapter.parse(payload))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("INVALID_HOSPITAL_D_CSV");
+                    assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).isEqualTo("Hospital D CSV has a header but no data row");
+                });
+    }
+
+    @ParameterizedTest(name = "[{index}] date of birth \"{0}\"")
+    @ValueSource(strings = {"1985-03-22", "22031985", "03221985", "not a date", "19851301", "19850230", "1985032"})
+    @DisplayName("transform refuses a date of birth that is not a real yyyyMMdd date")
+    void refusesADateOfBirthThatIsNotARealCompactDate(String dateOfBirth) {
+        HospitalDAdapter.HospitalDPayload payload =
+                adapter.parse(HEADER + "\n" + ROW.replace("19850322", dateOfBirth));
+
+        assertThatThrownBy(() -> adapter.transform(payload))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("INVALID_DATE_OF_BIRTH");
+                    assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).isEqualTo("Date of birth must be a real date in the format yyyyMMdd");
+                    assertThat(ex.getDetail())
+                            .isEqualTo(Map.of("field", "pt_dob_yyyymmdd", "expectedFormat", "yyyyMMdd"));
+                });
+    }
+
+    @Test
+    @DisplayName("A missing date of birth is not a parse error: it is left empty and validate then asks for it")
+    void leavesAMissingDateOfBirthEmptyForValidationToReport() {
+        HospitalDAdapter.HospitalDPayload payload =
+                adapter.parse(HEADER + "\n" + ROW.replace("19850322", ""));
+
+        InternalOrder order = adapter.transform(payload);
+
+        assertThat(order.getPatient().getDateOfBirth()).isNull();
+        assertThatThrownBy(() -> adapter.validate(order))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("patient.dateOfBirth is required");
+    }
+
+    @Test
+    @DisplayName("A data row without a date of birth column at all is treated the same way")
+    void leavesAnAbsentDateOfBirthColumnEmpty() {
+        HospitalDAdapter.HospitalDPayload payload = adapter.parse("source_system,pt_id\nHOSPITAL_D,456789");
+
+        assertThat(adapter.transform(payload).getPatient().getDateOfBirth()).isNull();
     }
 
     // ---------------------------------------------------------------- parse

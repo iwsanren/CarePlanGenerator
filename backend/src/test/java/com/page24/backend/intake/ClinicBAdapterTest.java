@@ -219,6 +219,22 @@ class ClinicBAdapterTest {
                 "diagnosis.additionalDiagnoses item must be a valid ICD-10 code");
     }
 
+    @ParameterizedTest(name = "[{index}] date of birth \"{0}\"")
+    @ValueSource(strings = {"1985-03-22", "22/03/1985", "13/01/2020", "3/22/1985", "03-22-1985", "not a date"})
+    @DisplayName("transform refuses a date of birth that is not MM/dd/yyyy as a bad request, not a server error")
+    void refusesADateOfBirthInTheWrongFormat(String dateOfBirth) {
+        ClinicBAdapter.ClinicBPayload payload = adapter.parse(JSON.replace("03/22/1985", dateOfBirth));
+
+        assertThatThrownBy(() -> adapter.transform(payload))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo("INVALID_DATE_OF_BIRTH");
+                    assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getMessage()).isEqualTo("Date of birth must be a real date in the format MM/dd/yyyy");
+                    assertThat(ex.getDetail())
+                            .isEqualTo(Map.of("field", "pt.dob", "expectedFormat", "MM/dd/yyyy"));
+                });
+    }
+
     private List<String> violationMessages(InternalOrder order) {
         assertThatThrownBy(() -> adapter.validate(order)).isInstanceOf(ConstraintViolationException.class);
         try {

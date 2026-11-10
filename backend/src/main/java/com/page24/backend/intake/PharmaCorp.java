@@ -9,6 +9,7 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +124,11 @@ public class PharmaCorp {
         if (dateText == null || dateText.isBlank()) {
             return null;
         }
-        return LocalDate.parse(dateText.trim());
+        try {
+            return LocalDate.parse(dateText.trim());
+        } catch (DateTimeParseException e) {
+            throw Common.invalidDateOfBirth("DateOfBirth", "yyyy-MM-dd");
+        }
     }
 
     private String nullSafe(String value) {
