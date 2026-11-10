@@ -275,6 +275,28 @@ class IntakeServiceTest {
     }
 
     @Test
+    @DisplayName("PharmaCorp: an IllegalArgumentException from the order pipeline is not reported as an invalid XML")
+    void pharmaCorpDoesNotBlameTheXmlForAFailureInsideTheOrderPipeline() {
+        IllegalArgumentException internalFailure = new IllegalArgumentException("something inside createOrder");
+        when(orderService.createOrder(any())).thenThrow(internalFailure);
+
+        Throwable thrown = catchThrowable(() -> intakeService.createFromPharmaCorpXml(PHARMA_XML, true));
+
+        assertThat(thrown).as("the real failure reaches the caller instead of a made-up INVALID_PHARMA_XML")
+                .isSameAs(internalFailure);
+    }
+
+    @Test
+    @DisplayName("PharmaCorp: a valid XML that the XPath mapping cannot read is still a 400 INVALID_PHARMA_XML")
+    void pharmaCorpStillRejectsXmlThatCannotBeParsedAsAnOrder() {
+        Throwable thrown = catchThrowable(() -> intakeService.createFromPharmaCorpXml("", true));
+
+        assertThat(thrown).isInstanceOfSatisfying(ValidationError.class,
+                ex -> assertThat(ex.getCode()).isEqualTo("INVALID_PHARMA_XML"));
+        verify(orderService, never()).createOrder(any());
+    }
+
+    @Test
     @DisplayName("PharmaCorp: the mapped request is validated, so a bad NPI is refused and nothing is created")
     void pharmaCorpValidatesTheMappedRequest() {
         Throwable thrown = catchThrowable(

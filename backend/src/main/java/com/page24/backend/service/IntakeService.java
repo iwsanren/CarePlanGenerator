@@ -65,13 +65,20 @@ public class IntakeService {
     }
 
     public OrderResponse createFromPharmaCorpXml(String rawXml, Boolean confirm) {
-        try {
-            PharmaCorp.PharmaCorpPayload payload = pharmaCorp.parseInput(rawXml);
-            validatePharmaPayload(payload);
+        PharmaCorp.PharmaCorpPayload payload = parsePharmaCorpXml(rawXml);
+        validatePharmaPayload(payload);
 
-            CreateOrderRequest mappedRequest = pharmaCorp.toCreateOrderRequest(payload, confirm);
-            validateMappedRequest(mappedRequest);
-            return orderService.createOrder(mappedRequest);
+        CreateOrderRequest mappedRequest = pharmaCorp.toCreateOrderRequest(payload, confirm);
+        validateMappedRequest(mappedRequest);
+        return orderService.createOrder(mappedRequest);
+    }
+
+    // Only the parsing step is guarded: that is where an IllegalArgumentException means "this XML cannot be read".
+    // If the same exception came out of the order pipeline it is a server-side failure, and calling it an invalid XML
+    // would send the caller (and whoever reads the logs) in the wrong direction.
+    private PharmaCorp.PharmaCorpPayload parsePharmaCorpXml(String rawXml) {
+        try {
+            return pharmaCorp.parseInput(rawXml);
         } catch (IllegalArgumentException e) {
             throw new ValidationError("INVALID_PHARMA_XML", "PharmaCorp XML payload is invalid");
         }
