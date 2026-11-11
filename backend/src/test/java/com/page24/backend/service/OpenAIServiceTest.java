@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -43,8 +44,12 @@ class OpenAIServiceTest {
         server.close();
     }
 
+    private OpenAIService serviceWithKey(String apiKey) {
+        return new OpenAIService(apiKey, server.url(PATH), "test-model", Duration.ofSeconds(30));
+    }
+
     private OpenAIService service() {
-        return new OpenAIService(API_KEY, server.url(PATH), "test-model", Duration.ofSeconds(30));
+        return serviceWithKey(API_KEY);
     }
 
     private static String reply(String content) {
@@ -102,6 +107,19 @@ class OpenAIServiceTest {
         service().generateCarePlan(PATIENT_INFO);
 
         assertThat(server.onlyRequest().body()).doesNotContain(API_KEY);
+    }
+
+    @ParameterizedTest(name = "[{index}] key \"{0}\" is a missing key")
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "\t"})
+    @DisplayName("A null, empty or blank key fails before any request, with a message that names the setting")
+    void refusesToCallWithoutAKey(String apiKey) {
+        OpenAIService service = serviceWithKey(apiKey);
+
+        assertThatThrownBy(() -> service.generateCarePlan(PATIENT_INFO))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("OpenAI API key is missing. Set llm.api.key or switch llm.provider.");
+        assertThat(server.requests()).as("nothing is sent without a key").isEmpty();
     }
 
     @ParameterizedTest(name = "[{index}] {0}")

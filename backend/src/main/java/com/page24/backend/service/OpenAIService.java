@@ -37,6 +37,14 @@ public class OpenAIService implements BaseLLMService {
 
     @Override
     public String generateCarePlan(String patientInfo) {
+        // Checked per call, not in the constructor: the bean is also created when the local mock provider is in use,
+        // and an empty key must not stop the application from starting then. Without this check an empty key would
+        // still be sent as "Bearer " and answered with a 401 that the caller then retries.
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException(
+                    "OpenAI API key is missing. Set llm.api.key or switch llm.provider.");
+        }
+
         try {
             String prompt = buildPrompt(patientInfo);
 
