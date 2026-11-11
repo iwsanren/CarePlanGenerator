@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.exception.ApiErrorResponse;
 import com.page24.backend.exception.BaseAppException;
+import com.page24.backend.exception.ValidationError;
 import com.page24.backend.service.OrderService;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,6 +19,7 @@ import java.util.Map;
  * Handler setting in AWS Lambda:
  *   com.page24.backend.aws.lambda.GetOrderHandler::handleRequest
  */
+@Slf4j
 public class GetOrderHandler {
 
     // findAndRegisterModules() adds the Java time module, needed to serialize LocalDate fields.
@@ -33,18 +36,9 @@ public class GetOrderHandler {
 
     public Map<String, Object> handleRequest(Map<String, Object> event) {
         try {
-            Long orderId = extractOrderId(event);
+            Long orderId = readOrderId(event);
             OrderResponse response = orderService.getOrderById(orderId);
             return jsonResponse(200, response);
-        } catch (IllegalArgumentException ex) {
-            ApiErrorResponse body = new ApiErrorResponse(
-                    "validation",
-                    "INVALID_ORDER_ID",
-                    ex.getMessage(),
-                    null,
-                    400
-            );
-            return jsonResponse(400, body);
         } catch (BaseAppException ex) {
             ApiErrorResponse body = new ApiErrorResponse(
                     ex.getType(),
@@ -55,6 +49,7 @@ public class GetOrderHandler {
             );
             return jsonResponse(ex.getHttpStatus().value(), body);
         } catch (Exception ex) {
+            log.error("Unexpected error while getting order in Lambda", ex);
             ApiErrorResponse body = new ApiErrorResponse(
                     "error",
                     "INTERNAL_SERVER_ERROR",
@@ -63,6 +58,17 @@ public class GetOrderHandler {
                     500
             );
             return jsonResponse(500, body);
+        }
+    }
+
+    // Only reading the id is guarded: the IllegalArgumentExceptions raised here are this handler's own messages about
+    // the request, so they are the caller's mistake (400). One thrown later, inside the order service, is a server-side
+    // failure; it must not be shown to the caller as a bad request with the exception's text as the message.
+    private Long readOrderId(Map<String, Object> event) {
+        try {
+            return extractOrderId(event);
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationError("INVALID_ORDER_ID", ex.getMessage());
         }
     }
 

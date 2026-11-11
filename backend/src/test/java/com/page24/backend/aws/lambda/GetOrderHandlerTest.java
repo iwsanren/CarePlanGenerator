@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.page24.backend.dto.OrderResponse;
 import com.page24.backend.exception.OrderNotFoundException;
+import com.page24.backend.service.LogCapture;
 import com.page24.backend.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -156,6 +157,44 @@ class GetOrderHandlerTest {
         assertThat(body.get("code").asText()).isEqualTo("INTERNAL_SERVER_ERROR");
         assertThat(body.get("detail").get("exception").asText()).isEqualTo("IllegalStateException");
         assertThat(response.get("body").toString()).doesNotContain("secret internal detail");
+    }
+
+    @Test
+    @DisplayName("an IllegalArgumentException from the order service is a 500, not a 400 that repeats its message")
+    void doesNotTurnAFailureInsideTheOrderServiceIntoABadRequest() {
+        when(orderService.getOrderById(7L))
+                .thenThrow(new IllegalArgumentException("internal detail: MRN 234567 for Jane Smith"));
+
+        Map<String, Object> response = handler.handleRequest(eventWithId("7"));
+
+        assertThat(response.get("statusCode")).as("a server-side failure is not the caller's mistake").isEqualTo(500);
+        JsonNode body = body(response);
+        assertThat(body.get("code").asText()).isEqualTo("INTERNAL_SERVER_ERROR");
+        assertThat(body.get("message").asText()).isEqualTo("Unexpected server error");
+        assertThat(response.get("body").toString()).doesNotContain("internal detail").doesNotContain("Jane Smith");
+    }
+
+    @Test
+    @DisplayName("an unexpected exception is logged, so a 500 can be found in the Lambda logs")
+    void logsAnUnexpectedException() {
+        when(orderService.getOrderById(7L)).thenThrow(new IllegalStateException("something broke"));
+
+        try (LogCapture logs = new LogCapture(GetOrderHandler.class)) {
+            handler.handleRequest(eventWithId("7"));
+
+            assertThat(logs.text()).contains("Unexpected error while getting order in Lambda")
+                    .contains("IllegalStateException");
+        }
+    }
+
+    @Test
+    @DisplayName("a bad request is not logged as an unexpected error")
+    void doesNotLogABadRequestAsAnError() {
+        try (LogCapture logs = new LogCapture(GetOrderHandler.class)) {
+            handler.handleRequest(eventWithId("abc"));
+
+            assertThat(logs.text()).isEmpty();
+        }
     }
 
     private Map<String, Object> eventWithId(String id) {

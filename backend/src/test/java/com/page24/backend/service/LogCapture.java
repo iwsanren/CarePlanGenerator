@@ -12,18 +12,18 @@ import java.util.stream.Collectors;
  * Collects what one class writes to the log while a test runs, so a test can check what reached the server log.
  * The text includes the full stack trace of any exception passed to the logger, not only the message line.
  */
-final class LogCapture implements AutoCloseable {
+public final class LogCapture implements AutoCloseable {
 
     private final Logger logger;
     private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
-    LogCapture(Class<?> source) {
+    public LogCapture(Class<?> source) {
         logger = (Logger) LoggerFactory.getLogger(source);
         appender.start();
         logger.addAppender(appender);
     }
 
-    String text() {
+    public String text() {
         return appender.list.stream()
                 .map(event -> event.getFormattedMessage()
                         + (event.getThrowableProxy() == null ? "" : "\n" + ThrowableProxyUtil.asString(event.getThrowableProxy())))
