@@ -1,7 +1,11 @@
 package com.page24.backend.intake;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -25,7 +29,10 @@ import java.util.Set;
 public class ClinicBAdapter implements BaseIntakeAdapter<ClinicBAdapter.ClinicBPayload> {
 
     // Keep mapper local so adapter does not depend on ObjectMapper bean registration.
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Unknown fields are ignored, so a clinic that adds a field to its JSON does not break its orders. Data that is
+    // required is still checked by validate(), so a mistyped name for a required field is reported as missing.
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final Validator validator;
 
     @Override
@@ -45,9 +52,42 @@ public class ClinicBAdapter implements BaseIntakeAdapter<ClinicBAdapter.ClinicBP
             throw new IntakeParseException(
                     "INVALID_CLINIC_B_JSON",
                     "Clinic B JSON payload is invalid",
-                    Map.of("reason", e.getOriginalMessage())
+                    Map.of("reason", describe(e))
             );
         }
+    }
+
+    // The reason is written here instead of copying Jackson's message: that message names internal classes
+    // ("class com.page24...ClinicBAdapter$ClinicBPayload") and, for a syntax error, quotes the text that was sent.
+    private static String describe(JsonProcessingException e) {
+        // A syntax error met while a section is being read comes wrapped in a JsonMappingException that carries the
+        // path of that section; it is still a syntax error, not a wrong type, so look at what it wraps.
+        JsonProcessingException problem = e.getCause() instanceof StreamReadException syntaxError ? syntaxError : e;
+        if (problem instanceof JsonMappingException mappingException) {
+            String path = fieldPath(mappingException.getPath());
+            return path.isEmpty()
+                    ? "The JSON does not have the structure of an order"
+                    : "Field '" + path + "' has the wrong type";
+        }
+        JsonLocation location = problem.getLocation();
+        return location == null
+                ? "Malformed JSON"
+                : "Malformed JSON at line " + location.getLineNr() + ", column " + location.getColumnNr();
+    }
+
+    private static String fieldPath(List<JsonMappingException.Reference> references) {
+        StringBuilder path = new StringBuilder();
+        for (JsonMappingException.Reference reference : references) {
+            if (reference.getFieldName() != null) {
+                if (path.length() > 0) {
+                    path.append('.');
+                }
+                path.append(reference.getFieldName());
+            } else if (reference.getIndex() >= 0) {
+                path.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return path.toString();
     }
 
     @Override

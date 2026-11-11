@@ -80,6 +80,34 @@ class IntakeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/intake/clinic-b - a field the API does not know does not make the order fail")
+    void shouldIgnoreAnUnknownFieldFromClinicB() throws Exception {
+        String json = clinicJson("IVIG", "1111111111", "123456", "G70.00")
+                .replaceFirst("\\{", "{\"field_added_by_the_clinic\": {\"a\": 1},");
+
+        mockMvc.perform(post("/api/v1/intake/clinic-b").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        verify(queueService, atLeastOnce()).enqueue(anyLong());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/intake/clinic-b - the 400 for a wrong type names the field, not an internal class")
+    void clinicBWrongTypeErrorDoesNotLeakClassNames() throws Exception {
+        String json = clinicJson("IVIG", "1111111111", "123456", "G70.00")
+                .replaceFirst("\\}\\s*$", ", \"med_hx\": {\"a\": 1}}");
+
+        mockMvc.perform(post("/api/v1/intake/clinic-b").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CLINIC_B_JSON"))
+                .andExpect(jsonPath("$.detail.reason").value("Field 'med_hx' has the wrong type"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("com.page24"))));
+
+        assertNothingWasCreated();
+    }
+
+    @Test
     @DisplayName("POST /api/v1/intake/pharma-corp - success + pending + enqueue")
     void shouldCreateOrderFromPharmaCorp() throws Exception {
         mockMvc.perform(post("/api/v1/intake/pharma-corp")

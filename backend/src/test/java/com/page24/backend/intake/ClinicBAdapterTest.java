@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
@@ -101,7 +102,7 @@ class ClinicBAdapterTest {
     @ParameterizedTest(name = "[{index}] {0}")
     @ValueSource(strings = {"{not json", "[1, 2, 3]", "\"just a string\"", "{\"pt\": \"not an object\"}",
             "{\"pt\": {\"wt\": \"heavy\"}}"})
-    @DisplayName("parse rejects text that is not JSON of the expected shape, and gives the parser's reason")
+    @DisplayName("parse rejects text that is not JSON of the expected shape, and gives a reason")
     void rejectsJsonThatCannotBeRead(String raw) {
         assertThatThrownBy(() -> adapter.parse(raw))
                 .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
@@ -111,6 +112,66 @@ class ClinicBAdapterTest {
                     assertThat(ex.getDetail()).isInstanceOfSatisfying(Map.class,
                             detail -> assertThat(detail.get("reason")).asString().isNotBlank());
                 });
+    }
+
+    @Test
+    @DisplayName("parse ignores fields it does not know, at the top level and inside sections, and keeps the known ones")
+    void ignoresUnknownFields() {
+        String json = JSON
+                .replace("\"order_info\"", "\"new_top_level_field\": {\"a\": 1}, \"order_info\"")
+                .replace("\"mrn\": \"234567\"", "\"mrn\": \"234567\", \"shoe_size\": 42")
+                .replace("\"med_name\": \"Gamunex-C\"", "\"med_name\": \"Gamunex-C\", \"brand\": [1, 2]");
+
+        ClinicBAdapter.ClinicBPayload payload = adapter.parse(json);
+
+        assertThat(payload.getPt().getMrn()).isEqualTo("234567");
+        assertThat(payload.getRx().getMedName()).isEqualTo("Gamunex-C");
+        assertThat(payload.getProvider().getNpiNum()).isEqualTo("0987654321");
+        assertThat(adapter.transform(payload).getPatient().getLastName()).isEqualTo("Smith");
+    }
+
+    @Test
+    @DisplayName("an unknown field does not hide a missing required one: validation still names it")
+    void unknownFieldsDoNotHideMissingRequiredData() {
+        // a mistyped section name ("provder") is dropped, so the provider data is missing and validate() says so
+        InternalOrder order = adapter.transform(adapter.parse(JSON.replace("\"provider\"", "\"provder\"")));
+
+        assertThatThrownBy(() -> adapter.validate(order)).isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("provider");
+    }
+
+    @Test
+    @DisplayName("the reason for a syntax error gives the position and does not echo the text that was sent")
+    void syntaxErrorReasonHasThePositionOnly() {
+        assertThatThrownBy(() -> adapter.parse("{\"pt\": {\"mrn\": 123 SECRET-TEXT}}"))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    String reason = reason(ex);
+                    assertThat(reason).matches("Malformed JSON at line \\d+, column \\d+");
+                    assertThat(reason).doesNotContain("SECRET-TEXT");
+                });
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @CsvSource(delimiter = '|', textBlock = """
+            {"pt": "not an object"}                              | Field 'pt' has the wrong type
+            {"pt": {"wt": "heavy"}}                              | Field 'pt.wt' has the wrong type
+            {"dx": {"secondary": ["E11.9", {"x": 1}]}}           | Field 'dx.secondary[1]' has the wrong type
+            {"med_hx": {"a": 1}}                                 | Field 'med_hx' has the wrong type
+            [1, 2, 3]                                            | The JSON does not have the structure of an order
+            "just a string"                                      | The JSON does not have the structure of an order
+            """)
+    @DisplayName("the reason for a wrong type names the field path and nothing else, in particular no class name")
+    void wrongTypeReasonNamesTheFieldPath(String raw, String expectedReason) {
+        assertThatThrownBy(() -> adapter.parse(raw))
+                .isInstanceOfSatisfying(IntakeParseException.class, ex -> {
+                    assertThat(reason(ex)).isEqualTo(expectedReason);
+                    assertThat(reason(ex)).doesNotContain("com.page24").doesNotContain("ClinicBAdapter")
+                            .doesNotContain("class ");
+                });
+    }
+
+    private static String reason(IntakeParseException ex) {
+        return (String) ((Map<?, ?>) ex.getDetail()).get("reason");
     }
 
     // ------------------------------------------------------------ transform
