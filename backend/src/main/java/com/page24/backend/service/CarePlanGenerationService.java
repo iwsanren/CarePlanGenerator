@@ -96,7 +96,9 @@ public class CarePlanGenerationService {
     @Recover
     public void handleAllRetriesExhausted(Exception e, Long carePlanId) {
         log.error("❌ All 3 retry attempts failed; marking the Care Plan as FAILED (carePlanId={})", carePlanId);
-        log.error("   Failure reason: {}", e.getMessage());
+        // Exception types and HTTP status only. The message can carry patient data, a database value or a key
+        // fragment (see FailureDescription), and this log is not a place for them.
+        log.error("   Failure: {}", FailureDescription.of(e));
 
         // Mark the plan as failed so the user can resubmit it later.
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {

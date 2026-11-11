@@ -20,6 +20,11 @@ import java.util.Map;
 @Slf4j
 public class ClaudeService implements BaseLLMService {
 
+    private static final String MISSING_KEY_MESSAGE =
+            "Claude API key is missing. Set llm.claude.api.key or switch llm.provider.";
+    private static final String UNEXPECTED_FORMAT_MESSAGE =
+            "Claude response format is unexpected: missing content[0].text";
+
     private final String apiKey;
     private final String model;
     private final Duration requestTimeout;
@@ -39,8 +44,10 @@ public class ClaudeService implements BaseLLMService {
     @Override
     public String generateCarePlan(String patientInfo) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                    "Claude API key is missing. Set llm.claude.api.key or switch llm.provider.");
+            // Our own fixed text, so it is safe to log and says what to change; the retry handler that logs the
+            // failure afterwards records exception types only.
+            log.error(MISSING_KEY_MESSAGE);
+            throw new IllegalStateException(MISSING_KEY_MESSAGE);
         }
 
         try {
@@ -74,9 +81,12 @@ public class ClaudeService implements BaseLLMService {
                     return textNode.asText();
                 }
             }
-            throw new RuntimeException("Claude response format is unexpected: missing content[0].text");
+            log.error(UNEXPECTED_FORMAT_MESSAGE);
+            throw new RuntimeException(UNEXPECTED_FORMAT_MESSAGE);
         } catch (Exception e) {
-            log.error("Claude 调用失败: {}", e.getMessage());
+            // Types and HTTP status only: the message of a parse error quotes the start of what the provider
+            // sent, which can be patient data, and an error body can contain the key.
+            log.error("Claude 调用失败: {}", FailureDescription.of(e));
             throw new RuntimeException("Claude failed to generate care plan", e);
         }
     }

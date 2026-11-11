@@ -15,8 +15,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -138,6 +141,29 @@ class CarePlanGenerationServiceUnitTest {
                 .doesNotContain("123456")
                 .doesNotContain("sk-secret");
         verify(carePlanRepository).save(carePlan);
+    }
+
+    @Test
+    @DisplayName("Retries exhausted -> the log names the care plan, the exception types and the HTTP status, nothing else")
+    void logsTheFailureWithoutTheExceptionMessages() {
+        when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
+        Exception cause = new RuntimeException("LLM failed for patient Alice Wong MRN 123456 key sk-secret-123",
+                WebClientResponseException.create(401, "Unauthorized", HttpHeaders.EMPTY,
+                        "{\"error\":\"key sk-secret-123 Alice Wong\"}".getBytes(StandardCharsets.UTF_8),
+                        StandardCharsets.UTF_8));
+
+        try (LogCapture logs = new LogCapture(CarePlanGenerationService.class)) {
+            service.handleAllRetriesExhausted(cause, CARE_PLAN_ID);
+
+            assertThat(logs.text())
+                    .contains("carePlanId=30")
+                    .contains("java.lang.RuntimeException")
+                    .contains("WebClientResponseException")
+                    .contains("(HTTP 401)")
+                    .doesNotContain("Alice")
+                    .doesNotContain("123456")
+                    .doesNotContain("sk-secret");
+        }
     }
 
     @Test

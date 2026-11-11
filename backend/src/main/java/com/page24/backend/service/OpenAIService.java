@@ -19,6 +19,11 @@ import java.util.Map;
 @Slf4j
 public class OpenAIService implements BaseLLMService {
 
+    private static final String MISSING_KEY_MESSAGE =
+            "OpenAI API key is missing. Set llm.api.key or switch llm.provider.";
+    private static final String UNEXPECTED_FORMAT_MESSAGE =
+            "OpenAI response format is unexpected: missing choices[0].message.content";
+
     private final String apiKey;
     private final String model;
     private final Duration requestTimeout;
@@ -41,8 +46,10 @@ public class OpenAIService implements BaseLLMService {
         // and an empty key must not stop the application from starting then. Without this check an empty key would
         // still be sent as "Bearer " and answered with a 401 that the caller then retries.
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                    "OpenAI API key is missing. Set llm.api.key or switch llm.provider.");
+            // Our own fixed text, so it is safe to log and says what to change; the retry handler that logs the
+            // failure afterwards records exception types only.
+            log.error(MISSING_KEY_MESSAGE);
+            throw new IllegalStateException(MISSING_KEY_MESSAGE);
         }
 
         try {
@@ -76,9 +83,12 @@ public class OpenAIService implements BaseLLMService {
             if (contentNode.isTextual() && !contentNode.asText().isBlank()) {
                 return contentNode.asText();
             }
-            throw new RuntimeException("OpenAI response format is unexpected: missing choices[0].message.content");
+            log.error(UNEXPECTED_FORMAT_MESSAGE);
+            throw new RuntimeException(UNEXPECTED_FORMAT_MESSAGE);
         } catch (Exception e) {
-            log.error("OpenAI 调用失败: {}", e.getMessage());
+            // Types and HTTP status only: the message of a parse error quotes the start of what the provider
+            // sent, which can be patient data, and an error body can contain the key.
+            log.error("OpenAI 调用失败: {}", FailureDescription.of(e));
             throw new RuntimeException("OpenAI failed to generate care plan", e);
         }
     }

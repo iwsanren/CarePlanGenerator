@@ -100,6 +100,56 @@ class ClaudeServiceTest {
         assertThat(server.onlyRequest().body()).doesNotContain(API_KEY);
     }
 
+    // ----------------------------------------------------------- what reaches the log
+
+    @Test
+    @DisplayName("A reply that is not JSON is logged by exception type, not by Jackson's message that quotes it")
+    void doesNotLogWhatTheProviderSent() {
+        server.respondWith(200, "SENSITIVEJANE is not json");
+
+        try (LogCapture logs = new LogCapture(ClaudeService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("JsonParseException").doesNotContain("SENSITIVEJANE");
+        }
+    }
+
+    @Test
+    @DisplayName("An HTTP error is logged with its status code, without the body the provider sent")
+    void logsTheStatusButNotTheBodyOfAnErrorAnswer() {
+        server.respondWith(401, "{\"error\":{\"message\":\"invalid x-api-key sk-leaky-key for Jane\"}}");
+
+        try (LogCapture logs = new LogCapture(ClaudeService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("(HTTP 401)").doesNotContain("sk-leaky-key").doesNotContain("Jane");
+        }
+    }
+
+    @Test
+    @DisplayName("An unexpected reply shape is logged with the fixed text this class wrote about it")
+    void logsTheFixedTextOfAnUnexpectedReplyShape() {
+        server.respondWith(200, "{\"content\":[]}");
+
+        try (LogCapture logs = new LogCapture(ClaudeService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("Claude response format is unexpected: missing content[0].text");
+        }
+    }
+
+    @Test
+    @DisplayName("A missing key is logged with the setting to change, so the cause is clear from the log alone")
+    void logsTheFixedTextOfAMissingKey() {
+        try (LogCapture logs = new LogCapture(ClaudeService.class)) {
+            assertThatThrownBy(() -> serviceWithKey("").generateCarePlan(PATIENT_INFO))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(logs.text())
+                    .contains("Claude API key is missing. Set llm.claude.api.key or switch llm.provider.");
+        }
+    }
+
     @ParameterizedTest(name = "[{index}] key \"{0}\" is a missing key")
     @NullAndEmptySource
     @ValueSource(strings = {"   ", "\t"})

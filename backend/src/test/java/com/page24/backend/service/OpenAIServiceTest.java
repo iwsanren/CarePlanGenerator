@@ -109,6 +109,55 @@ class OpenAIServiceTest {
         assertThat(server.onlyRequest().body()).doesNotContain(API_KEY);
     }
 
+    // ----------------------------------------------------------- what reaches the log
+
+    @Test
+    @DisplayName("A reply that is not JSON is logged by exception type, not by Jackson's message that quotes it")
+    void doesNotLogWhatTheProviderSent() {
+        server.respondWith(200, "SENSITIVEJANE is not json");
+
+        try (LogCapture logs = new LogCapture(OpenAIService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("JsonParseException").doesNotContain("SENSITIVEJANE");
+        }
+    }
+
+    @Test
+    @DisplayName("An HTTP error is logged with its status code, without the body the provider sent")
+    void logsTheStatusButNotTheBodyOfAnErrorAnswer() {
+        server.respondWith(401, "{\"error\":{\"message\":\"Incorrect API key provided: sk-leaky-key for Jane\"}}");
+
+        try (LogCapture logs = new LogCapture(OpenAIService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("(HTTP 401)").doesNotContain("sk-leaky-key").doesNotContain("Jane");
+        }
+    }
+
+    @Test
+    @DisplayName("An unexpected reply shape is logged with the fixed text this class wrote about it")
+    void logsTheFixedTextOfAnUnexpectedReplyShape() {
+        server.respondWith(200, "{\"choices\":[]}");
+
+        try (LogCapture logs = new LogCapture(OpenAIService.class)) {
+            assertThatThrownBy(() -> service().generateCarePlan(PATIENT_INFO)).isInstanceOf(RuntimeException.class);
+
+            assertThat(logs.text()).contains("OpenAI response format is unexpected: missing choices[0].message.content");
+        }
+    }
+
+    @Test
+    @DisplayName("A missing key is logged with the setting to change, so the cause is clear from the log alone")
+    void logsTheFixedTextOfAMissingKey() {
+        try (LogCapture logs = new LogCapture(OpenAIService.class)) {
+            assertThatThrownBy(() -> serviceWithKey("").generateCarePlan(PATIENT_INFO))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(logs.text()).contains("OpenAI API key is missing. Set llm.api.key or switch llm.provider.");
+        }
+    }
+
     @ParameterizedTest(name = "[{index}] key \"{0}\" is a missing key")
     @NullAndEmptySource
     @ValueSource(strings = {"   ", "\t"})
