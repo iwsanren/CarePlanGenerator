@@ -104,6 +104,21 @@ class CreateOrderHandlerEdgeCaseTest {
     }
 
     @Test
+    @DisplayName("An IllegalArgumentException from the order service is a 500 that does not repeat its message")
+    void doesNotTurnAFailureInsideTheOrderServiceIntoABadRequest() {
+        when(orderService.createOrder(any(CreateOrderRequest.class)))
+                .thenThrow(new IllegalArgumentException("internal detail: MRN 234567 for Jane Smith"));
+
+        Map<String, Object> response = handler().handleRequest(Map.of("body", bodyWithConfirm("false")));
+
+        assertThat(response.get("statusCode")).as("a server-side failure is not the caller's mistake").isEqualTo(500);
+        JsonNode body = body(response);
+        assertThat(body.get("code").asText()).isEqualTo("INTERNAL_SERVER_ERROR");
+        assertThat(body.get("message").asText()).isEqualTo("Unexpected server error");
+        assertThat((String) response.get("body")).doesNotContain("internal detail").doesNotContain("Jane Smith");
+    }
+
+    @Test
     @DisplayName("An application exception keeps its type, code, message, detail and status")
     void keepsEveryFieldOfAnApplicationException() {
         WarningException warning = new WarningException("DUPLICATE_ORDER", "Possible duplicate", Map.of("orderId", 5));

@@ -56,19 +56,10 @@ public class CreateOrderHandler {
 
     public Map<String, Object> handleRequest(Map<String, Object> event) {
         try {
-            CreateOrderRequest request = parseBody(event);
+            CreateOrderRequest request = readRequest(event);
             validate(request);
             OrderResponse response = orderService.createOrder(request);
             return jsonResponse(HttpStatus.CREATED.value(), response);
-        } catch (IllegalArgumentException ex) {
-            ApiErrorResponse body = new ApiErrorResponse(
-                    "validation",
-                    "INVALID_REQUEST_BODY",
-                    ex.getMessage(),
-                    null,
-                    HttpStatus.BAD_REQUEST.value()
-            );
-            return jsonResponse(HttpStatus.BAD_REQUEST.value(), body);
         } catch (BaseAppException ex) {
             ApiErrorResponse body = new ApiErrorResponse(
                     ex.getType(),
@@ -88,6 +79,17 @@ public class CreateOrderHandler {
                     HttpStatus.INTERNAL_SERVER_ERROR.value()
             );
             return jsonResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), body);
+        }
+    }
+
+    // Only reading the body is guarded: the IllegalArgumentExceptions raised here are this handler's own messages about
+    // the request, so they are the caller's mistake (400). One thrown later, inside the order service, is a server-side
+    // failure; it must not be shown to the caller as a bad request with the exception's text as the message.
+    private CreateOrderRequest readRequest(Map<String, Object> event) {
+        try {
+            return parseBody(event);
+        } catch (IllegalArgumentException ex) {
+            throw new com.page24.backend.exception.ValidationError("INVALID_REQUEST_BODY", ex.getMessage());
         }
     }
 
