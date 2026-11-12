@@ -160,6 +160,25 @@ class GetOrderHandlerTest {
     }
 
     @Test
+    @DisplayName("an order that cannot be written as JSON is a 500 in both the status code and the body")
+    void answers500WhenTheResponseCannotBeSerialised() {
+        OrderResponse unwritable = new OrderResponse() {
+            @Override
+            public Long getId() {
+                throw new IllegalStateException("cannot be written");
+            }
+        };
+        when(orderService.getOrderById(7L)).thenReturn(unwritable);
+
+        Map<String, Object> response = handler.handleRequest(eventWithId("7"));
+
+        assertThat(response.get("statusCode")).as("not the 200 of an order that could not be reported").isEqualTo(500);
+        JsonNode body = body(response);
+        assertThat(body.get("code").asText()).isEqualTo("JSON_SERIALIZATION_FAILED");
+        assertThat(body.get("httpStatus").asInt()).isEqualTo(500);
+    }
+
+    @Test
     @DisplayName("an IllegalArgumentException from the order service is a 500, not a 400 that repeats its message")
     void doesNotTurnAFailureInsideTheOrderServiceIntoABadRequest() {
         when(orderService.getOrderById(7L))

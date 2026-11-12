@@ -149,6 +149,9 @@ class CreateOrderHandlerEdgeCaseTest {
 
         Map<String, Object> response = handler.handleRequest(Map.of("body", bodyWithConfirm("false")));
 
+        assertThat(response.get("statusCode"))
+                .as("the status code says 500 too, not the 201 of an order that could not be reported")
+                .isEqualTo(500);
         JsonNode body = body(response);
         assertThat(body.get("type").asText()).isEqualTo("error");
         assertThat(body.get("code").asText()).isEqualTo("JSON_SERIALIZATION_FAILED");

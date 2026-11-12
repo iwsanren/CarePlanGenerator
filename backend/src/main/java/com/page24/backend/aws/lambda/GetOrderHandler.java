@@ -97,18 +97,21 @@ public class GetOrderHandler {
         headers.put("Access-Control-Allow-Origin", "*");
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("statusCode", statusCode);
-        response.put("headers", headers);
-        response.put("body", toJson(body));
-        return response;
-    }
-
-    private String toJson(Object body) {
+        // The body is written first: if it cannot be, the response is a 500 in its status code as well as in its body,
+        // not a 200 whose body says 500.
+        String json;
+        int status = statusCode;
         try {
-            return objectMapper.writeValueAsString(body);
+            json = objectMapper.writeValueAsString(body);
         } catch (JsonProcessingException ex) {
-            return "{\"type\":\"error\",\"code\":\"JSON_SERIALIZATION_FAILED\","
+            status = 500;
+            json = "{\"type\":\"error\",\"code\":\"JSON_SERIALIZATION_FAILED\","
                     + "\"message\":\"Failed to serialize response\",\"httpStatus\":500}";
         }
+
+        response.put("statusCode", status);
+        response.put("headers", headers);
+        response.put("body", json);
+        return response;
     }
 }
