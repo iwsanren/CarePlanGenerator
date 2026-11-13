@@ -1,5 +1,8 @@
 name: CI
 
+# Four jobs, each one a required status check for main (see README "Continuous Integration").
+# Do NOT rename a job's `name:` and do NOT add `paths:` filters: branch protection matches
+# checks by name, and a skipped or renamed check leaves a pull request waiting forever.
 on:
   pull_request:
   push:
@@ -15,9 +18,12 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (Maven verify)
+    name: Backend verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Must equal <java.version> in backend/pom.xml; the "Check Java version" step enforces it.
+      JAVA_VERSION: "17"
     defaults:
       run:
         working-directory: backend
@@ -27,16 +33,58 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: ${{ env.JAVA_VERSION }}
           cache: maven
           cache-dependency-path: backend/pom.xml
+
+      - name: Check Java version matches pom.xml
+        run: |
+          pom_java=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' pom.xml | head -n 1)
+          echo "pom.xml java.version = '${pom_java}', CI JAVA_VERSION = '${JAVA_VERSION}'"
+          if [ "${pom_java}" != "${JAVA_VERSION}" ]; then
+            echo "::error::CI builds with Java ${JAVA_VERSION} but backend/pom.xml declares java.version ${pom_java}. Update JAVA_VERSION in ci.yml (and the Dockerfile base images) together with the pom."
+            exit 1
+          fi
+
+      # The *PostgresTest classes use Testcontainers with disabledWithoutDocker = true, which
+      # SKIPS them (green build) when Docker is missing. Fail early instead of skipping silently.
+      - name: Check Docker is available
+        run: |
+          if ! docker info > /dev/null 2>&1; then
+            echo "::error::Docker is not available on this runner, so the Testcontainers tests would be skipped silently."
+            exit 1
+          fi
+          docker version
 
       # mvnw is committed without the executable bit.
       - name: Make mvnw executable
         run: chmod +x mvnw
 
-      - name: Build and test
-        run: ./mvnw -B verify
+      # verify = compile + tests + JaCoCo report + JaCoCo threshold check + Checkstyle + SpotBugs.
+      - name: Maven verify (tests, JaCoCo threshold, Checkstyle, SpotBugs)
+        run: ./mvnw -B -ntp verify
+
+      # Second line of defence: Docker was there, but did the Testcontainers tests really run?
+      - name: Check Testcontainers tests were not skipped
+        run: |
+          shopt -s nullglob
+          reports=(target/surefire-reports/TEST-*PostgresTest.xml)
+          if [ "${#reports[@]}" -eq 0 ]; then
+            echo "::error::No *PostgresTest reports found in target/surefire-reports; the Testcontainers tests did not run."
+            exit 1
+          fi
+          failed=0
+          for report in "${reports[@]}"; do
+            suite=$(grep -m 1 '<testsuite ' "${report}")
+            tests=$(echo "${suite}" | grep -o ' tests="[0-9]*"' | grep -o '[0-9]*' || true)
+            skipped=$(echo "${suite}" | grep -o ' skipped="[0-9]*"' | grep -o '[0-9]*' || true)
+            echo "$(basename "${report}"): tests=${tests:-?} skipped=${skipped:-?}"
+            if [ -z "${tests}" ] || [ "${tests}" -eq 0 ] || [ "${skipped:-1}" -ne 0 ]; then
+              echo "::error::${report} ran no tests or skipped some; Testcontainers did not execute as expected."
+              failed=1
+            fi
+          done
+          exit "${failed}"
 
       - name: Upload JaCoCo report
         if: always()
@@ -45,17 +93,23 @@ jobs:
           name: jacoco-report
           path: backend/target/site/jacoco/
           if-no-files-found: warn
+          retention-days: 14
 
+      # On failure: surefire (why a test failed) plus the Checkstyle and SpotBugs XML results.
       - name: Upload surefire reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports
-          path: backend/target/surefire-reports/
+          path: |
+            backend/target/surefire-reports/
+            backend/target/checkstyle-result.xml
+            backend/target/spotbugsXml.xml
           if-no-files-found: warn
+          retention-days: 14
 
   frontend:
-    name: Frontend (npm build)
+    name: Frontend lint, test, build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -66,12 +120,44 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
+      # Vitest with the v8 coverage thresholds from vitest.config.ts (fails below them).
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      # `npm run build` = tsc (also type-checks the tests) + vite build.
       - name: Build
         run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+  docker:
+    # Build only, never push: proves each Dockerfile still builds from a clean checkout.
+    name: Docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }} image
+        run: docker build --pull --tag careplan-${{ matrix.service }}:ci ./${{ matrix.service }}

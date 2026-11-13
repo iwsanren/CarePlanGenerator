@@ -1,4 +1,6 @@
-FROM node:18-alpine
+# Node 22 = the version CI and the developers use; Node 18 is end-of-life and some
+# devDependencies (Playwright, ESLint) require Node 20 or newer.
+FROM node:22-alpine
 
 WORKDIR /app
 

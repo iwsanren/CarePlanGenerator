@@ -100,7 +100,7 @@ These screenshots show role-based UI controls. Spring Security independently enf
 | LLM | OpenAI / Anthropic Claude / local mock (configurable) |
 | Frontend | React 18 + TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS |
 | Testing | JUnit 5, Mockito, H2, Testcontainers (PostgreSQL), JaCoCo, Playwright (e2e) |
-| CI | GitHub Actions (Maven `verify` + JaCoCo report, frontend build) |
+| CI | GitHub Actions (backend `verify` with Checkstyle, SpotBugs and JaCoCo threshold; frontend lint, tests with coverage threshold and build; Docker image builds) |
 | Observability | Spring Boot Actuator, Micrometer, Prometheus, Grafana |
 | API docs | OpenAPI 3 / Swagger UI (springdoc-openapi) |
 | Infrastructure | Docker, Docker Compose, Terraform (AWS Lambda, API Gateway, SQS, RDS) |
@@ -404,7 +404,7 @@ Windows PowerShell:
 ```powershell
 .\mvnw.cmd test
 ```
-Most tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. PostgreSQL-specific behaviour (JPA persistence and Flyway migrations) is verified against a real PostgreSQL container with Testcontainers (`OrderPersistencePostgresTest`, `FlywayMigrationPostgresTest`); these tests are skipped automatically when Docker is not available. Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests.
+Most tests use an H2 in-memory database, mocked queue infrastructure and local LLM support, so they do not require a real LLM API or running Keycloak. PostgreSQL-specific behaviour (JPA persistence and Flyway migrations) is verified against a real PostgreSQL container with Testcontainers (`OrderPersistencePostgresTest`, `FlywayMigrationPostgresTest`, `BatchInfrastructurePostgresTest`); on a developer machine these tests are skipped automatically when Docker is not available (CI treats a skip as a failure, see "Continuous Integration"). Security filters remain enabled. The API test profile disables the actual worker to avoid consuming mocked queue entries; asynchronous processing is exercised separately by the Docker/Keycloak browser tests.
 
 ## Code Quality (Checkstyle and SpotBugs)
 
@@ -449,6 +449,40 @@ Point both IDE plugins at the same files Maven uses, so the editor shows what `v
 5. Build the module first (*Build | Build Project*), because SpotBugs analyses compiled classes, then run the analysis from the *SpotBugs* tool window or the editor context menu.
 
 Menu and option names differ slightly between plugin versions; the settings that matter are the Checkstyle engine version, the config file path, and the SpotBugs threshold and exclude filter file.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every pull request, on every push to `main`, and on demand (`workflow_dispatch`). It has four checks, shown on a pull request under these exact names:
+
+| Check name | What it runs | Fails when |
+|---|---|---|
+| `Backend verify` | Java 17 check against `pom.xml`, Docker check, `./mvnw -B -ntp verify` in `backend/`, Testcontainers-not-skipped check | a test fails, JaCoCo line or branch coverage is below the `pom.xml` thresholds, Checkstyle or SpotBugs reports a problem, `JAVA_VERSION` in `ci.yml` differs from `java.version` in `pom.xml`, or a `*PostgresTest` was skipped |
+| `Frontend lint, test, build` | Node 22: `npm ci`, `npm run lint`, `npm run test:coverage`, `npm run build` in `frontend/` | an ESLint warning or error, a failing test, coverage below `COVERAGE_THRESHOLDS` in `vitest.config.ts`, or a TypeScript or Vite build error |
+| `Docker build (backend)` | `docker build ./backend` (build only, nothing is pushed) | the Dockerfile cannot build from a clean checkout |
+| `Docker build (frontend)` | `docker build ./frontend` (build only, nothing is pushed) | the Dockerfile cannot build from a clean checkout |
+
+Playwright end-to-end tests (`frontend/e2e/`) are not part of CI: they need the whole Docker Compose stack and Keycloak.
+
+**Artifacts** (Actions run page, "Artifacts" section, kept 14 days): `jacoco-report` and `frontend-coverage` (always uploaded, open `index.html` inside); `surefire-reports` (only when the backend job fails: test reports plus `checkstyle-result.xml` and `spotbugsXml.xml`).
+
+**Testcontainers on GitHub:** `ubuntu-latest` runners have Docker installed and running, so the three `*PostgresTest` classes pull `postgres:16-alpine` and run normally. Because `@Testcontainers(disabledWithoutDocker = true)` would turn a missing Docker into a silent skip, the backend job fails if Docker is missing or if any `*PostgresTest` report shows zero tests or skipped tests. An occasional `toomanyrequests` error while pulling the image is Docker Hub's anonymous rate limit; re-run the job.
+
+**Run the same checks locally** (from the repository root):
+
+```bash
+cd backend && ./mvnw -B -ntp verify
+cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build
+docker build ./backend && docker build ./frontend
+```
+
+**Branch protection for `main`** (Settings, Branches, Add branch protection rule, branch name pattern `main`):
+
+1. Tick *Require a pull request before merging*. While there is a single maintainer keep *Required approvals* at 0 (GitHub does not let you approve your own pull request); raise it to 1 when a second contributor joins. Also tick *Dismiss stale pull request approvals when new commits are pushed* and *Require conversation resolution before merging*.
+2. Tick *Require status checks to pass before merging* and *Require branches to be up to date before merging*, then add all four checks by name: `Backend verify`, `Frontend lint, test, build`, `Docker build (backend)`, `Docker build (frontend)`. A check only appears in the search box after it has run at least once in the last 7 days, so open a pull request and let CI finish first.
+3. Tick *Do not allow bypassing the above settings* so that nobody, administrators included, can push straight to `main`.
+4. Leave *Allow force pushes* and *Allow deletions* unticked. Optionally tick *Require linear history* and merge with squash.
+
+Renaming a job's `name:` in `ci.yml` or adding `paths:` filters to the workflow breaks these required checks (they stay "Expected" forever), so change the rule together with the workflow. Branch protection needs a public repository or a paid plan.
 
 ## Common Commands
 
