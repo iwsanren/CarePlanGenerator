@@ -5,6 +5,7 @@ import com.page24.backend.entity.Order;
 import com.page24.backend.repository.CarePlanRepository;
 import com.page24.backend.entity.Patient;
 import com.page24.backend.entity.Provider;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -80,6 +81,8 @@ public class CarePlanGenerationService {
         carePlan.setContent(content);
         carePlan.setStatus(CarePlan.Status.COMPLETED);
         carePlan.setErrorMessage(null);
+        // Inside a retry, the context knows how many attempts failed before this one.
+        carePlan.markFinished(LocalDateTime.now(), RetryAttempts.current());
         carePlanRepository.save(carePlan);
 
         log.info("✅ Care Plan generation completed (carePlanId={})", carePlanId);
@@ -106,6 +109,8 @@ public class CarePlanGenerationService {
             // Store a stable, user-safe message. The original exception can include
             // provider internals or patient data and must stay in server logs only.
             carePlan.setErrorMessage(GENERATION_FAILURE_MESSAGE);
+            // Every attempt failed, so the retry context holds the number of failures = attempts made.
+            carePlan.markFinished(LocalDateTime.now(), RetryAttempts.exhausted());
             carePlanRepository.save(carePlan);
         });
     }

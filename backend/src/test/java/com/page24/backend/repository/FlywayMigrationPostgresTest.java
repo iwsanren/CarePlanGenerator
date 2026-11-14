@@ -48,6 +48,12 @@ class FlywayMigrationPostgresTest {
             "batch_step_execution",
             "batch_step_execution_context");
 
+    // Columns added to care_plans by V3, with the type and nullability the CarePlan entity maps (no default).
+    private static final List<String> TIMING_COLUMNS = List.of(
+            "attempt_count integer YES null",
+            "finished_at timestamp without time zone YES null",
+            "started_at timestamp without time zone YES null");
+
     @BeforeEach
     void resetDatabase() throws SQLException {
         // Every test starts from a completely empty schema.
@@ -60,11 +66,11 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: V1 and V2 ran and both are recorded as successful
+        // Then: V1, V2 and V3 ran and all are recorded as successful
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(2);
+        assertThat(result.migrationsExecuted).isEqualTo(3);
         assertThat(query("SELECT version || ':' || success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
-                .containsExactly("1:true", "2:true");
+                .containsExactly("1:true", "2:true", "3:true");
 
         // audit_events has the expected columns, types and nullability
         assertThat(query("""
@@ -107,10 +113,67 @@ class FlywayMigrationPostgresTest {
         // pre-existing rows get the column default
         assertThat(query("SELECT created_by_subject || '/' || updated_by_subject FROM orders"))
                 .containsExactly("legacy/legacy", "legacy/legacy");
-        // history: the baseline marker (0) for the adopted schema, then V1 and V2 applied on top of it
+        // history: the baseline marker (0) for the adopted schema, then V1, V2 and V3 applied on top of it
         assertThat(query("SELECT version FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
-                .containsExactly("0", "1", "2");
+                .containsExactly("0", "1", "2", "3");
         assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
+    }
+
+    @Test
+    @DisplayName("V3 on an empty database is a no-op: care_plans does not exist yet (Hibernate creates it later)")
+    void v3IsANoOpOnAnEmptyDatabase() throws SQLException {
+        MigrateResult result = flyway().migrate();
+
+        assertThat(result.success).isTrue();
+        assertThat(query("SELECT version || ':' || success FROM flyway_schema_history WHERE version = '3'"))
+                .containsExactly("3:true");
+        // ALTER TABLE IF EXISTS did not create the table, and nothing else appeared
+        assertThat(query("SELECT table_name FROM information_schema.tables WHERE table_name = 'care_plans'")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("V3 on a legacy database adds the three timing columns; existing care plans get NULL, not 0")
+    void v3AddsTimingColumnsToLegacyCarePlans() throws SQLException {
+        // Given: an older database whose care_plans table already holds rows (no Flyway history yet)
+        execute("""
+                CREATE TABLE care_plans (
+                    id BIGSERIAL PRIMARY KEY,
+                    status VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP)""",
+                "INSERT INTO care_plans (status, created_at) VALUES ('COMPLETED', now()), ('FAILED', now())");
+
+        // When
+        MigrateResult result = flyway().migrate();
+
+        // Then: columns exist with the types the CarePlan entity expects, are nullable and have no default
+        assertThat(result.success).isTrue();
+        assertThat(timingColumns("care_plans")).containsExactlyElementsOf(TIMING_COLUMNS);
+        // pre-existing rows have no data: NULL in all three columns (a 0 would pollute averages and failure rates)
+        assertThat(query("""
+                SELECT count(*)::text FROM care_plans
+                WHERE started_at IS NULL AND finished_at IS NULL AND attempt_count IS NULL"""))
+                .containsExactly("2");
+        // and the new columns accept values
+        execute("""
+                UPDATE care_plans SET started_at = now(), finished_at = now(), attempt_count = 2 WHERE id = 1""");
+        assertThat(query("SELECT attempt_count::text FROM care_plans WHERE id = 1")).containsExactly("2");
+    }
+
+    @Test
+    @DisplayName("V3 does not fail when the timing columns already exist (Hibernate or a manual ALTER got there first)")
+    void v3ToleratesExistingTimingColumns() throws SQLException {
+        // Given: V1 and V2 applied, then care_plans created with one of the new columns already present
+        flyway(configure -> configure.target("2")).migrate();
+        execute("CREATE TABLE care_plans (id BIGSERIAL PRIMARY KEY, status VARCHAR(255) NOT NULL, attempt_count INTEGER)",
+                "INSERT INTO care_plans (status, attempt_count) VALUES ('COMPLETED', 3)");
+
+        // When / Then: IF NOT EXISTS keeps the existing column and its data, and adds the missing two
+        MigrateResult result = flyway().migrate();
+        assertThat(result.success).isTrue();
+        assertThat(result.migrationsExecuted).isEqualTo(1);
+        assertThat(timingColumns("care_plans")).containsExactlyElementsOf(TIMING_COLUMNS);
+        assertThat(query("SELECT attempt_count::text FROM care_plans")).containsExactly("3");
     }
 
     @Test
@@ -140,9 +203,9 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: only V2 ran, V1 data is untouched
+        // Then: V2 and V3 ran (V3 is a no-op here: there is no care_plans table), V1 data is untouched
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(1);
+        assertThat(result.migrationsExecuted).isEqualTo(2);
         assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
         assertThat(query("SELECT actor_subject FROM audit_events")).containsExactly("user-1");
     }
@@ -197,6 +260,14 @@ class FlywayMigrationPostgresTest {
                 .baselineVersion("0");
         customizer.accept(configuration);
         return configuration.load();
+    }
+
+    private List<String> timingColumns(String table) throws SQLException {
+        return query("""
+                SELECT column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, 'null')
+                FROM information_schema.columns
+                WHERE table_name = '%s' AND column_name IN ('started_at', 'finished_at', 'attempt_count')
+                ORDER BY column_name""".formatted(table));
     }
 
     private List<String> batchTables() throws SQLException {

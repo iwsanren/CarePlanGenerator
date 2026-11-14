@@ -10,10 +10,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -106,6 +108,56 @@ class CarePlanWorkerTest {
         verify(carePlanRepository).save(plan);
         verify(carePlanGenerationService).generateWithRetry(9L);
         verify(carePlanGenerationService).generateWithRetry(10L);
+    }
+
+    @Test
+    @DisplayName("PROCESSING stamps started_at and has no finish time or attempt count yet")
+    void stampsStartedAtWhenProcessingBegins() {
+        CarePlan plan = carePlan(11L);
+        when(queueService.dequeue()).thenReturn(11L, (Long) null);
+        when(carePlanRepository.findById(11L)).thenReturn(Optional.of(plan));
+        LocalDateTime before = LocalDateTime.now();
+
+        worker.pollQueue();
+
+        assertThat(plan.getStartedAt()).isNotNull().isBetween(before, LocalDateTime.now());
+        assertThat(plan.getFinishedAt()).isNull();
+        assertThat(plan.getAttemptCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("started_at is already saved when generation starts, so the saved row carries it")
+    void startedAtIsSavedBeforeGeneration() {
+        CarePlan plan = carePlan(12L);
+        when(queueService.dequeue()).thenReturn(12L, (Long) null);
+        when(carePlanRepository.findById(12L)).thenReturn(Optional.of(plan));
+        doAnswer(invocation -> {
+            assertThat(plan.getStartedAt()).isNotNull();
+            return null;
+        }).when(carePlanGenerationService).generateWithRetry(12L);
+
+        worker.pollQueue();
+
+        verify(carePlanGenerationService).generateWithRetry(12L);
+    }
+
+    @Test
+    @DisplayName("Re-processing a FAILED plan starts a new run: the old finish time and attempt count are cleared")
+    void newRunClearsTheResultOfTheEarlierRun() {
+        CarePlan plan = carePlan(13L);
+        plan.setStatus(CarePlan.Status.FAILED);
+        plan.setStartedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 0));
+        plan.setFinishedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 6));
+        plan.setAttemptCount(3);
+        when(queueService.dequeue()).thenReturn(13L, (Long) null);
+        when(carePlanRepository.findById(13L)).thenReturn(Optional.of(plan));
+
+        worker.pollQueue();
+
+        assertThat(plan.getStatus()).isEqualTo(CarePlan.Status.PROCESSING);
+        assertThat(plan.getStartedAt()).isAfter(LocalDateTime.of(2026, 1, 1, 10, 0, 6));
+        assertThat(plan.getFinishedAt()).isNull();
+        assertThat(plan.getAttemptCount()).isNull();
     }
 
     private CarePlan carePlan(Long id) {

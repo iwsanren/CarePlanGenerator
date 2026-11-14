@@ -1,6 +1,5 @@
 package com.page24.backend.service;
 
-import com.page24.backend.entity.CarePlan;
 import com.page24.backend.repository.CarePlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +9,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.time.LocalDateTime;
 
 /**
  * Care Plan worker. Two ways it gets triggered:
@@ -63,7 +64,8 @@ public class CarePlanWorker {
         log.info("System worker picked up task: carePlanId={}", carePlanId);
 
         carePlanRepository.findById(carePlanId).ifPresent(carePlan -> {
-            carePlan.setStatus(CarePlan.Status.PROCESSING);
+            // Also stamps started_at and clears the result of any earlier run.
+            carePlan.markProcessing(LocalDateTime.now());
             carePlanRepository.save(carePlan);
         });
         log.info("⚙️  Status updated to PROCESSING: carePlanId={}", carePlanId);

@@ -29,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +94,36 @@ class OrderServiceUploadUnitTest {
         assertThat(response.getCarePlanContent()).isEqualTo("Reviewed care plan");
         // An upload never goes back through the generation queue.
         verify(carePlanQueue, never()).enqueue(any());
+    }
+
+    @Test
+    @DisplayName("Upload over an LLM-generated plan -> started_at, finished_at and attempt_count become NULL")
+    void clearsTheGenerationTimingOfTheEarlierLlmRun() {
+        carePlan.setStartedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 0));
+        carePlan.setFinishedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 9));
+        carePlan.setAttemptCount(3);
+        givenOrderAndCarePlanExist();
+
+        orderService.uploadCarePlan(ORDER_ID, "Reviewed care plan", null);
+
+        assertThat(carePlan.isUploaded()).isTrue();
+        assertThat(carePlan.getStartedAt()).isNull();
+        assertThat(carePlan.getFinishedAt()).isNull();
+        assertThat(carePlan.getAttemptCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("A rejected upload leaves the generation timing as it was")
+    void rejectedUploadKeepsTheTiming() {
+        LocalDateTime started = LocalDateTime.of(2026, 1, 1, 10, 0, 0);
+        carePlan.setStartedAt(started);
+        carePlan.setAttemptCount(3);
+        givenOrderAndCarePlanExist();
+
+        assertRejectedAsInvalidUpload(null, null);
+
+        assertThat(carePlan.getStartedAt()).isEqualTo(started);
+        assertThat(carePlan.getAttemptCount()).isEqualTo(3);
     }
 
     @Test

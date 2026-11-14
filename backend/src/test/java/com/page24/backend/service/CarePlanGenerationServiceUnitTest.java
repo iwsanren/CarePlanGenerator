@@ -15,12 +15,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.context.RetryContextSupport;
+import org.springframework.retry.support.RetrySynchronizationManager;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -78,6 +81,43 @@ class CarePlanGenerationServiceUnitTest {
     }
 
     @Test
+    @DisplayName("Success on a direct call (no retry context) -> finished_at is set and it counts as 1 attempt")
+    void recordsFinishTimeAndOneAttemptOnSuccess() {
+        carePlan.setStartedAt(LocalDateTime.now().minusSeconds(5));
+        when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
+        when(llmAdapterFactory.getService()).thenReturn(llmService);
+        when(llmService.generateCarePlan(any())).thenReturn("generated care plan");
+        LocalDateTime before = LocalDateTime.now();
+
+        service.generateWithRetry(CARE_PLAN_ID);
+
+        assertThat(carePlan.getFinishedAt()).isNotNull().isBetween(before, LocalDateTime.now());
+        assertThat(carePlan.getFinishedAt()).isAfterOrEqualTo(carePlan.getStartedAt());
+        assertThat(carePlan.getAttemptCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Success on the 3rd attempt (two failures in the retry context) -> attempt_count 3")
+    void countsTheAttemptFromTheRetryContext() {
+        when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
+        when(llmAdapterFactory.getService()).thenReturn(llmService);
+        when(llmService.generateCarePlan(any())).thenReturn("generated care plan");
+        RetryContextSupport context = new RetryContextSupport(null);
+        context.registerThrowable(new IllegalStateException("attempt 1 failed"));
+        context.registerThrowable(new IllegalStateException("attempt 2 failed"));
+        RetrySynchronizationManager.register(context);
+        try {
+            service.generateWithRetry(CARE_PLAN_ID);
+        } finally {
+            RetrySynchronizationManager.clear();
+        }
+
+        assertThat(carePlan.getStatus()).isEqualTo(CarePlan.Status.COMPLETED);
+        assertThat(carePlan.getAttemptCount()).isEqualTo(3);
+        assertThat(carePlan.getFinishedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("The LLM receives the patient context built from this care plan's order")
     void sendsThePatientContextOfTheOrderToTheLlm() {
         when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
@@ -120,6 +160,9 @@ class CarePlanGenerationServiceUnitTest {
         // A failed attempt must neither mark the plan COMPLETED nor persist anything; the worker owns the status.
         assertThat(carePlan.getStatus()).isEqualTo(CarePlan.Status.PROCESSING);
         assertThat(carePlan.getContent()).isNull();
+        // ... and a failed attempt is not the end of the run, so no finish time or attempt count yet.
+        assertThat(carePlan.getFinishedAt()).isNull();
+        assertThat(carePlan.getAttemptCount()).isNull();
         verify(carePlanRepository, never()).save(any(CarePlan.class));
     }
 
@@ -141,6 +184,40 @@ class CarePlanGenerationServiceUnitTest {
                 .doesNotContain("123456")
                 .doesNotContain("sk-secret");
         verify(carePlanRepository).save(carePlan);
+    }
+
+    @Test
+    @DisplayName("Retries exhausted (3 failures in the retry context) -> FAILED with finished_at and attempt_count 3")
+    void recordsFinishTimeAndAttemptCountWhenRecovering() {
+        carePlan.setStartedAt(LocalDateTime.now().minusSeconds(7));
+        when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
+        RetryContextSupport context = new RetryContextSupport(null);
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            context.registerThrowable(new IllegalStateException("attempt " + attempt + " failed"));
+        }
+        RetrySynchronizationManager.register(context);
+        LocalDateTime before = LocalDateTime.now();
+        try {
+            service.handleAllRetriesExhausted(new IllegalStateException("attempt 3 failed"), CARE_PLAN_ID);
+        } finally {
+            RetrySynchronizationManager.clear();
+        }
+
+        assertThat(carePlan.getStatus()).isEqualTo(CarePlan.Status.FAILED);
+        assertThat(carePlan.getFinishedAt()).isNotNull().isBetween(before, LocalDateTime.now());
+        assertThat(carePlan.getAttemptCount()).isEqualTo(3);
+        verify(carePlanRepository).save(carePlan);
+    }
+
+    @Test
+    @DisplayName("Recovery called directly (no retry context) -> FAILED with finished_at and 1 attempt")
+    void recoveryWithoutRetryContextCountsOneAttempt() {
+        when(carePlanRepository.findById(CARE_PLAN_ID)).thenReturn(Optional.of(carePlan));
+
+        service.handleAllRetriesExhausted(new RuntimeException("boom"), CARE_PLAN_ID);
+
+        assertThat(carePlan.getFinishedAt()).isNotNull();
+        assertThat(carePlan.getAttemptCount()).isEqualTo(1);
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.page24.backend.service.CarePlanGenerationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +83,9 @@ public class GenerateCarePlanHandler {
             return;
         }
 
-        carePlan.setStatus(CarePlan.Status.PROCESSING);
+        // Same as the worker: stamps started_at and clears the result of an earlier run (an SQS redelivery
+        // after a failed run starts a new run).
+        carePlan.markProcessing(LocalDateTime.now());
         carePlanRepository.save(carePlan);
         log.info("Started SQS care plan generation: carePlanId={}, messageId={}", carePlanId, messageId);
 

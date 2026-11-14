@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +55,38 @@ class GenerateCarePlanHandlerTest {
         assertThat(pending.getStatus()).isEqualTo(CarePlan.Status.PROCESSING);
         verify(carePlanRepository).save(pending);
         verify(carePlanGenerationService).generateWithRetry(42L);
+    }
+
+    @Test
+    @DisplayName("Lambda path also stamps started_at when it moves the plan to PROCESSING")
+    void stampsStartedAtLikeTheWorker() {
+        CarePlan pending = carePlan(42L, CarePlan.Status.PENDING);
+        CarePlan completed = carePlan(42L, CarePlan.Status.COMPLETED);
+        when(carePlanRepository.findById(42L)).thenReturn(Optional.of(pending), Optional.of(completed));
+        LocalDateTime before = LocalDateTime.now();
+
+        handler.handleRequest(event(record("msg-1", "{\"carePlanId\":42}")));
+
+        assertThat(pending.getStartedAt()).isNotNull().isBetween(before, LocalDateTime.now());
+        assertThat(pending.getFinishedAt()).isNull();
+        assertThat(pending.getAttemptCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("SQS redelivery of a FAILED plan starts a new run and clears the old finish time and attempt count")
+    void redeliveryAfterFailureStartsANewRun() {
+        CarePlan failed = carePlan(42L, CarePlan.Status.FAILED);
+        failed.setStartedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 0));
+        failed.setFinishedAt(LocalDateTime.of(2026, 1, 1, 10, 0, 6));
+        failed.setAttemptCount(3);
+        CarePlan completed = carePlan(42L, CarePlan.Status.COMPLETED);
+        when(carePlanRepository.findById(42L)).thenReturn(Optional.of(failed), Optional.of(completed));
+
+        handler.handleRequest(event(record("msg-1", "{\"carePlanId\":42}")));
+
+        assertThat(failed.getStartedAt()).isAfter(LocalDateTime.of(2026, 1, 1, 10, 0, 6));
+        assertThat(failed.getFinishedAt()).isNull();
+        assertThat(failed.getAttemptCount()).isNull();
     }
 
     @Test

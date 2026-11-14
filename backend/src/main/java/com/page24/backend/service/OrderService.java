@@ -276,6 +276,7 @@ public class OrderService {
         carePlan.setContent(null);
         carePlan.setErrorMessage(null);
         carePlan.setUploaded(false);   // a fresh LLM run replaces any prior manual upload
+        carePlan.clearGenerationTiming();   // the old run's timing must not describe the new one (NULL = no data)
         order.setUpdatedBySubject(Actor.subject());
         orderRepository.save(order);
         carePlanRepository.save(carePlan);
@@ -306,6 +307,8 @@ public class OrderService {
         carePlan.setStatus(CarePlan.Status.COMPLETED);
         carePlan.setErrorMessage(null);
         carePlan.setUploaded(true);
+        // No LLM ran, so there is no generation time; also drops the timing of an earlier LLM run.
+        carePlan.clearGenerationTiming();
         order.setUpdatedBySubject(Actor.subject());
         orderRepository.save(order);
         carePlanRepository.save(carePlan);
