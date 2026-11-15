@@ -99,7 +99,7 @@ public class SecurityConfig {
                     }
                     a.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/v1/export", "/api/v1/export/**",
-                                    "/api/v1/reports/**").hasRole("PHARMACIST")
+                                    "/api/v1/reports/**", "/api/v1/dashboard/**").hasRole("PHARMACIST")
                             .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/regenerate",
                                     "/api/v1/orders/*/careplan/upload").hasRole("PHARMACIST")
                             .requestMatchers(HttpMethod.DELETE, "/api/v1/patients/**",

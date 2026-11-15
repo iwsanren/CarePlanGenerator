@@ -72,7 +72,24 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/v1/intake/pharma-corp'].post.requestBody.content['application/xml']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/intake/hospital-d'].post.requestBody.content['text/csv']").exists())
                 .andExpect(jsonPath("$.tags[*].name").value(org.hamcrest.Matchers.hasItems(
-                        "Orders", "Patients", "Providers", "Intake", "Export", "Reports")));
+                        "Orders", "Patients", "Providers", "Intake", "Export", "Reports", "Dashboard")));
+    }
+
+    @Test
+    @DisplayName("The dashboard endpoint is documented: days parameter limited to 7/30 and the response schema")
+    void dashboardEndpointIsDocumented() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.summary").value("Dashboard statistics"))
+                .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.description")
+                        .value(org.hamcrest.Matchers.containsString("PHARMACIST only")))
+                .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.parameters[0].name").value("days"))
+                .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.parameters[0].schema.enum")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("7", "30")))
+                .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.components.schemas.DashboardStatsResponse.properties.kpi").exists())
+                .andExpect(jsonPath("$.components.schemas.DashboardStatsResponse.properties.dailyOrders").exists())
+                .andExpect(jsonPath("$.components.schemas.Kpi.properties.failureRate").exists());
     }
 
     @Test
