@@ -117,6 +117,26 @@ class DashboardServicePostgresTest {
                 "2026-11-08=2", "2026-11-09=0", "2026-11-10=3", "2026-11-11=0",
                 "2026-11-12=2", "2026-11-13=0", "2026-11-14=1");
 
+        // daily trend (date|completed|failed|failureRate|avgSeconds), LLM-generated plans only, per creation day:
+        //  11-08 #1 #2 completed (10 s, 20 s)             -> 2|0|0.0|15.0
+        //  11-10 #3 failed, #4 completed 30 s, #5 pending -> 1|1|0.5|30.0 (the failed run's 6 s is not averaged)
+        //  11-12 #8 completed without timing (#7 is an upload, left out) -> 1|0|0.0|null: a real 0 rate, no average
+        //  11-14 #6 still processing                      -> 0|0|null|null: nothing finished, nothing to rate
+        assertThat(stats.dailyTrend()).extracting(t -> t.date() + "|" + t.completedCount() + "|" + t.failedCount()
+                + "|" + t.failureRate() + "|" + t.avgGenerationSeconds()).containsExactly(
+                "2026-11-08|2|0|0.0|15.0",
+                "2026-11-09|0|0|null|null",
+                "2026-11-10|1|1|0.5|30.0",
+                "2026-11-11|0|0|null|null",
+                "2026-11-12|1|0|0.0|null",
+                "2026-11-13|0|0|null|null",
+                "2026-11-14|0|0|null|null");
+        // the per-day counts add up to the KPI counts
+        assertThat(stats.dailyTrend().stream().mapToLong(t -> t.completedCount()).sum())
+                .isEqualTo(stats.kpi().completedCount());
+        assertThat(stats.dailyTrend().stream().mapToLong(t -> t.failedCount()).sum())
+                .isEqualTo(stats.kpi().failedCount());
+
         // status shares: always four entries, in enum order
         assertThat(stats.statusBreakdown()).extracting(s -> s.status() + "=" + s.count() + "/" + s.share())
                 .containsExactly("PENDING=1/0.125", "PROCESSING=1/0.125", "COMPLETED=5/0.625", "FAILED=1/0.125");
@@ -163,6 +183,17 @@ class DashboardServicePostgresTest {
                 .findFirst().orElseThrow().count()).isEqualTo(1);
         assertThat(stats.dailyOrders().stream().filter(d -> d.date().equals(LocalDate.of(2026, 11, 7)))
                 .findFirst().orElseThrow().count()).isEqualTo(1);
+        // trend: the two older days are filled in, 11-15 00:00 (#10) is still outside
+        assertThat(stats.dailyTrend()).hasSize(30);
+        assertThat(stats.dailyTrend().stream().filter(t -> t.date().equals(LocalDate.of(2026, 10, 20)))
+                .findFirst().orElseThrow()).extracting(t -> t.completedCount() + "|" + t.failureRate() + "|"
+                + t.avgGenerationSeconds()).isEqualTo("1|0.0|40.0");
+        assertThat(stats.dailyTrend().stream().filter(t -> t.date().equals(LocalDate.of(2026, 11, 7)))
+                .findFirst().orElseThrow()).extracting(t -> t.completedCount() + "|" + t.failureRate() + "|"
+                + t.avgGenerationSeconds()).isEqualTo("1|0.0|100.0");
+        assertThat(stats.dailyTrend().stream().filter(t -> t.date().equals(LocalDate.of(2026, 10, 17)))
+                .findFirst().orElseThrow()).extracting(t -> t.failureRate() + "|" + t.avgGenerationSeconds())
+                .isEqualTo("null|null");
         // #10 (11-15 00:00) is still outside
         assertThat(stats.kpi().totalOrders()).isEqualTo(10);
         assertThat(stats.statusBreakdown()).extracting(s -> s.status() + "=" + s.count())
@@ -181,6 +212,8 @@ class DashboardServicePostgresTest {
         DashboardStatsResponse stats = dashboardService.getStats(7);
 
         assertThat(stats.dailyOrders()).hasSize(7).allMatch(d -> d.count() == 0);
+        assertThat(stats.dailyTrend()).hasSize(7).allMatch(t -> t.completedCount() == 0 && t.failedCount() == 0
+                && t.failureRate() == null && t.avgGenerationSeconds() == null);
         assertThat(stats.statusBreakdown()).hasSize(4).allMatch(s -> s.count() == 0 && s.share() == 0.0);
         assertThat(stats.kpi().totalOrders()).isZero();
         assertThat(stats.kpi().failureRate()).isNull();
@@ -205,6 +238,12 @@ class DashboardServicePostgresTest {
         assertThat(kpi.manualUploadCount()).isEqualTo(1);
         assertThat(kpi.failureRate()).isNull();
         assertThat(kpi.avgGenerationSeconds()).isNull();
+        // the same day in the trend: three plans, none of them finished by the LLM -> nothing to rate
+        DashboardStatsResponse.DailyTrend day = dashboardService.getStats(7).dailyTrend().get(4);
+        assertThat(day.completedCount()).isZero();
+        assertThat(day.failedCount()).isZero();
+        assertThat(day.failureRate()).isNull();
+        assertThat(day.avgGenerationSeconds()).isNull();
     }
 
     @Test
@@ -223,6 +262,7 @@ class DashboardServicePostgresTest {
         // (1.5 + 2.0) / 2 = 1.75; truncating each run to whole seconds would give 1.5
         assertThat(stats.kpi().avgGenerationSeconds()).isEqualTo(1.75);
         assertThat(stats.providerStats().get(0).avgGenerationSeconds()).isEqualTo(1.75);
+        assertThat(stats.dailyTrend().get(4).avgGenerationSeconds()).isEqualTo(1.75); // 2026-11-12
     }
 
     @Test

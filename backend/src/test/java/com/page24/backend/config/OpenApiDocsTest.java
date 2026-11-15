@@ -89,6 +89,9 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/v1/dashboard/stats'].get.responses['200']").exists())
                 .andExpect(jsonPath("$.components.schemas.DashboardStatsResponse.properties.kpi").exists())
                 .andExpect(jsonPath("$.components.schemas.DashboardStatsResponse.properties.dailyOrders").exists())
+                .andExpect(jsonPath("$.components.schemas.DashboardStatsResponse.properties.dailyTrend").exists())
+                .andExpect(jsonPath("$.components.schemas.DailyTrend.properties.failureRate").exists())
+                .andExpect(jsonPath("$.components.schemas.DailyTrend.properties.avgGenerationSeconds").exists())
                 .andExpect(jsonPath("$.components.schemas.Kpi.properties.failureRate").exists());
     }
 

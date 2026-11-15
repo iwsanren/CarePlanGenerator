@@ -116,6 +116,15 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.dailyOrders[6].date").value(now.toLocalDate().toString()))
                 .andExpect(jsonPath("$.dailyOrders[6].count").value(2))
                 .andExpect(jsonPath("$.dailyOrders[0].count").value(0))
+                .andExpect(jsonPath("$.dailyTrend", hasSize(7)))
+                .andExpect(jsonPath("$.dailyTrend[6].date").value(now.toLocalDate().toString()))
+                .andExpect(jsonPath("$.dailyTrend[6].completedCount").value(1))
+                .andExpect(jsonPath("$.dailyTrend[6].failedCount").value(1))
+                .andExpect(jsonPath("$.dailyTrend[6].failureRate").value(0.5))
+                .andExpect(jsonPath("$.dailyTrend[6].avgGenerationSeconds").value(10.0))
+                .andExpect(jsonPath("$.dailyTrend[0].completedCount").value(0))
+                .andExpect(jsonPath("$.dailyTrend[0].failureRate").value(nullValue()))
+                .andExpect(jsonPath("$.dailyTrend[0].avgGenerationSeconds").value(nullValue()))
                 .andExpect(jsonPath("$.kpi.totalOrders").value(2))
                 .andExpect(jsonPath("$.kpi.completedCount").value(1))
                 .andExpect(jsonPath("$.kpi.failedCount").value(1))
@@ -135,16 +144,18 @@ class DashboardControllerTest {
     }
 
     @Test
-    @DisplayName("No days parameter -> 7; days=30 -> 30 daily entries")
+    @DisplayName("No days parameter -> 7; days=30 -> 30 daily entries (orders and trend)")
     void defaultsToSevenAndAcceptsThirty() throws Exception {
         mockMvc.perform(get(URL).with(user("pharmacist").roles("PHARMACIST")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.days").value(7))
-                .andExpect(jsonPath("$.dailyOrders", hasSize(7)));
+                .andExpect(jsonPath("$.dailyOrders", hasSize(7)))
+                .andExpect(jsonPath("$.dailyTrend", hasSize(7)));
         mockMvc.perform(get(URL).param("days", "30").with(user("pharmacist").roles("PHARMACIST")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.days").value(30))
-                .andExpect(jsonPath("$.dailyOrders", hasSize(30)));
+                .andExpect(jsonPath("$.dailyOrders", hasSize(30)))
+                .andExpect(jsonPath("$.dailyTrend", hasSize(30)));
     }
 
     @Test
@@ -153,6 +164,10 @@ class DashboardControllerTest {
         mockMvc.perform(get(URL).with(user("pharmacist").roles("PHARMACIST")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kpi.totalOrders").value(0))
+                .andExpect(jsonPath("$.dailyTrend", hasSize(7)))
+                .andExpect(jsonPath("$.dailyTrend[3].completedCount").value(0))
+                .andExpect(jsonPath("$.dailyTrend[3].failureRate").value(nullValue()))
+                .andExpect(jsonPath("$.dailyTrend[3].avgGenerationSeconds").value(nullValue()))
                 .andExpect(jsonPath("$.kpi.failureRate").value(nullValue()))
                 .andExpect(jsonPath("$.kpi.avgGenerationSeconds").value(nullValue()))
                 .andExpect(jsonPath("$.statusBreakdown", hasSize(4)))

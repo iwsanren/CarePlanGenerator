@@ -2,6 +2,7 @@ package com.page24.backend.service;
 
 import com.page24.backend.dto.DashboardStatsResponse;
 import com.page24.backend.dto.DashboardStatsResponse.DailyOrders;
+import com.page24.backend.dto.DashboardStatsResponse.DailyTrend;
 import com.page24.backend.dto.DashboardStatsResponse.Kpi;
 import com.page24.backend.dto.DashboardStatsResponse.MedicationCount;
 import com.page24.backend.dto.DashboardStatsResponse.ProviderStats;
@@ -11,6 +12,7 @@ import com.page24.backend.exception.ValidationError;
 import com.page24.backend.repository.DashboardQueryRepository;
 import com.page24.backend.repository.DashboardQueryRepository.DailyCountRow;
 import com.page24.backend.repository.DashboardQueryRepository.KpiRow;
+import com.page24.backend.repository.DashboardQueryRepository.TrendRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -69,6 +71,8 @@ public class DashboardService {
         log.debug("Building dashboard stats: days={}, from={}, to={}", days, from, to);
 
         List<DailyOrders> dailyOrders = fillMissingDays(queries.countOrdersPerDay(start, end), from, days);
+        List<DailyTrend> dailyTrend = fillMissingTrendDays(
+                queries.dailyTrend(start, end, CarePlan.Status.COMPLETED, CarePlan.Status.FAILED), from, days);
         List<StatusShare> statusBreakdown = statusBreakdown(start, end);
         List<MedicationCount> medications = queries.topMedications(start, end, PageRequest.of(0, TOP_N)).stream()
                 .map(row -> new MedicationCount(row.getMedicationName(), row.getOrderCount()))
@@ -81,7 +85,7 @@ public class DashboardService {
 
         long totalOrders = dailyOrders.stream().mapToLong(DailyOrders::count).sum();
         return new DashboardStatsResponse(days, from, to, TIMEZONE,
-                kpi(start, end, totalOrders), dailyOrders, statusBreakdown, medications, providers);
+                kpi(start, end, totalOrders), dailyOrders, dailyTrend, statusBreakdown, medications, providers);
     }
 
     /** The query returns only days that have orders; the chart needs every day of the window. */
@@ -117,11 +121,36 @@ public class DashboardService {
         KpiRow row = queries.kpi(start, end, CarePlan.Status.COMPLETED, CarePlan.Status.FAILED);
         long completed = orZero(row.getCompletedCount());
         long failed = orZero(row.getFailedCount());
-        long finished = completed + failed;
-        // Nothing finished yet: there is no rate to show, which is different from a rate of 0.
-        Double failureRate = finished == 0 ? null : round((double) failed / finished, 4);
-        return new Kpi(totalOrders, completed, failed, failureRate,
+        return new Kpi(totalOrders, completed, failed, failureRate(completed, failed),
                 roundOrNull(row.getAvgSeconds(), 2), orZero(row.getManualUploadCount()));
+    }
+
+    /** The query returns only days that have care plans; the trend chart needs every day, with gaps as null. */
+    private static List<DailyTrend> fillMissingTrendDays(List<TrendRow> rows, LocalDate from, int days) {
+        Map<LocalDate, TrendRow> rowByDay = new HashMap<>();
+        for (TrendRow row : rows) {
+            rowByDay.put(row.getDay(), row);
+        }
+        List<DailyTrend> result = new ArrayList<>(days);
+        for (int offset = 0; offset < days; offset++) {
+            LocalDate day = from.plusDays(offset);
+            TrendRow row = rowByDay.get(day);
+            if (row == null) {
+                result.add(new DailyTrend(day, 0L, 0L, null, null));
+                continue;
+            }
+            long completed = orZero(row.getCompletedCount());
+            long failed = orZero(row.getFailedCount());
+            result.add(new DailyTrend(day, completed, failed, failureRate(completed, failed),
+                    roundOrNull(row.getAvgSeconds(), 2)));
+        }
+        return result;
+    }
+
+    /** failed / (completed + failed). Nothing finished: no rate to show, which is different from a rate of 0. */
+    private static Double failureRate(long completed, long failed) {
+        long finished = completed + failed;
+        return finished == 0 ? null : round((double) failed / finished, 4);
     }
 
     private static long orZero(Long count) {

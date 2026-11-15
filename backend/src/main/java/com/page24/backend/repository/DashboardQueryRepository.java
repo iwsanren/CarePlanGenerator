@@ -31,6 +31,16 @@ public interface DashboardQueryRepository extends Repository<Order, Long> {
         long getOrderCount();
     }
 
+    interface TrendRow {
+        LocalDate getDay();
+
+        Long getCompletedCount();
+
+        Long getFailedCount();
+
+        Double getAvgSeconds();
+    }
+
     interface StatusCountRow {
         CarePlan.Status getStatus();
 
@@ -74,6 +84,23 @@ public interface DashboardQueryRepository extends Repository<Order, Long> {
             order by cast(o.createdAt as LocalDate)
             """)
     List<DailyCountRow> countOrdersPerDay(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /** One row per day that has at least one care plan; the counts and the average follow the KPI definitions. */
+    @Query("""
+            select cast(o.createdAt as LocalDate) as day,
+              sum(case when cp.status = :completed and cp.uploaded = false then 1 else 0 end) as completedCount,
+              sum(case when cp.status = :failed and cp.uploaded = false then 1 else 0 end) as failedCount,
+              avg(case when cp.status = :completed and cp.uploaded = false
+                        and cp.startedAt is not null and cp.finishedAt is not null
+                       then (cp.finishedAt - cp.startedAt) by second else null end) as avgSeconds
+            from CarePlan cp join cp.order o
+            where o.createdAt >= :from and o.createdAt < :to
+            group by cast(o.createdAt as LocalDate)
+            order by cast(o.createdAt as LocalDate)
+            """)
+    List<TrendRow> dailyTrend(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
+                              @Param("completed") CarePlan.Status completed,
+                              @Param("failed") CarePlan.Status failed);
 
     @Query("""
             select cp.status as status, count(cp) as planCount

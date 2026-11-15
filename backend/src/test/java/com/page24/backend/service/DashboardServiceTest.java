@@ -9,6 +9,7 @@ import com.page24.backend.repository.DashboardQueryRepository.KpiRow;
 import com.page24.backend.repository.DashboardQueryRepository.MedicationCountRow;
 import com.page24.backend.repository.DashboardQueryRepository.ProviderRow;
 import com.page24.backend.repository.DashboardQueryRepository.StatusCountRow;
+import com.page24.backend.repository.DashboardQueryRepository.TrendRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ class DashboardServiceTest {
         service = new DashboardService(queries, CLOCK);
         // an empty database by default; tests override what they need
         when(queries.countOrdersPerDay(any(), any())).thenReturn(List.of());
+        when(queries.dailyTrend(any(), any(), any(), any())).thenReturn(List.of());
         when(queries.countCarePlansPerStatus(any(), any())).thenReturn(List.of());
         when(queries.topMedications(any(), any(), any())).thenReturn(List.of());
         when(queries.providerStats(any(), any(), any(), any(), any())).thenReturn(List.of());
@@ -81,7 +83,17 @@ class DashboardServiceTest {
 
         assertThat(stats.from()).isEqualTo(LocalDate.of(2026, 10, 16));
         assertThat(stats.dailyOrders()).hasSize(30);
+        assertThat(stats.dailyTrend()).hasSize(30);
         verify(queries).countOrdersPerDay(LocalDateTime.of(2026, 10, 16, 0, 0), LocalDateTime.of(2026, 11, 15, 0, 0));
+    }
+
+    @Test
+    @DisplayName("The trend query gets the same window and the same two statuses as the KPI query")
+    void trendUsesTheSameWindowAndStatusesAsTheKpi() {
+        service.getStats(7);
+
+        verify(queries).dailyTrend(LocalDateTime.of(2026, 11, 8, 0, 0), LocalDateTime.of(2026, 11, 15, 0, 0),
+                CarePlan.Status.COMPLETED, CarePlan.Status.FAILED);
     }
 
     @Test
@@ -131,6 +143,74 @@ class DashboardServiceTest {
 
         assertThat(stats.dailyOrders()).hasSize(7).allMatch(d -> d.count() == 0);
         assertThat(stats.kpi().totalOrders()).isZero();
+    }
+
+    // ----- daily trend -----
+
+    @Test
+    @DisplayName("No care plans -> every day of the window is present with 0 counts and null rate / average")
+    void emptyTrendHasEveryDayWithNulls() {
+        DashboardStatsResponse stats = service.getStats(7);
+
+        assertThat(stats.dailyTrend()).extracting(t -> t.date().toString()).containsExactly(
+                "2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14");
+        assertThat(stats.dailyTrend()).allMatch(t -> t.completedCount() == 0 && t.failedCount() == 0
+                && t.failureRate() == null && t.avgGenerationSeconds() == null);
+    }
+
+    @Test
+    @DisplayName("Days with rows get their own rate and average; the other days stay null (gaps, not zeros)")
+    void trendMapsRowsToTheirDay() {
+        when(queries.dailyTrend(any(), any(), any(), any())).thenReturn(List.of(
+                new Trend(LocalDate.of(2026, 11, 9), 3L, 1L, 12.345),
+                new Trend(LocalDate.of(2026, 11, 12), 0L, 2L, null)));
+
+        DashboardStatsResponse stats = service.getStats(7);
+
+        assertThat(stats.dailyTrend()).extracting(t -> t.date() + "|" + t.completedCount() + "|" + t.failedCount()
+                + "|" + t.failureRate() + "|" + t.avgGenerationSeconds()).containsExactly(
+                "2026-11-08|0|0|null|null",
+                "2026-11-09|3|1|0.25|12.35",
+                "2026-11-10|0|0|null|null",
+                "2026-11-11|0|0|null|null",
+                "2026-11-12|0|2|1.0|null",
+                "2026-11-13|0|0|null|null",
+                "2026-11-14|0|0|null|null");
+    }
+
+    @Test
+    @DisplayName("All plans of a day finished OK -> real rate 0.0; no timing data -> average stays null")
+    void trendKeepsRealZeroAndMissingTimingApart() {
+        when(queries.dailyTrend(any(), any(), any(), any())).thenReturn(List.of(
+                new Trend(LocalDate.of(2026, 11, 10), 2L, 0L, null)));
+
+        DashboardStatsResponse.DailyTrend day = service.getStats(7).dailyTrend().get(2);
+
+        assertThat(day.failureRate()).isEqualTo(0.0);
+        assertThat(day.avgGenerationSeconds()).isNull();
+    }
+
+    @Test
+    @DisplayName("A day that only has unfinished plans (NULL sums) -> counts 0, rate null, average null")
+    void trendDayWithNullSumsIsEmpty() {
+        when(queries.dailyTrend(any(), any(), any(), any())).thenReturn(List.of(
+                new Trend(LocalDate.of(2026, 11, 10), null, null, null)));
+
+        DashboardStatsResponse.DailyTrend day = service.getStats(7).dailyTrend().get(2);
+
+        assertThat(day.completedCount()).isZero();
+        assertThat(day.failedCount()).isZero();
+        assertThat(day.failureRate()).isNull();
+        assertThat(day.avgGenerationSeconds()).isNull();
+    }
+
+    @Test
+    @DisplayName("Per-day rate uses the same rounding as the KPI: 1 of 3 -> 0.3333")
+    void trendRateIsRoundedLikeTheKpi() {
+        when(queries.dailyTrend(any(), any(), any(), any())).thenReturn(List.of(
+                new Trend(LocalDate.of(2026, 11, 10), 2L, 1L, 1.0)));
+
+        assertThat(service.getStats(7).dailyTrend().get(2).failureRate()).isEqualTo(0.3333);
     }
 
     // ----- status shares -----
@@ -272,6 +352,10 @@ class DashboardServiceTest {
     // ----- fake rows: a record component named getX() implements the interface method getX() -----
 
     private record Day(LocalDate getDay, long getOrderCount) implements DailyCountRow {
+    }
+
+    private record Trend(LocalDate getDay, Long getCompletedCount, Long getFailedCount, Double getAvgSeconds)
+            implements TrendRow {
     }
 
     private record StatusRow(CarePlan.Status getStatus, long getPlanCount) implements StatusCountRow {
