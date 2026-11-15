@@ -1,6 +1,6 @@
 import { signOut, useAuth } from '@/auth/auth'
 import { Link, useLocation } from 'react-router-dom'
-import { FileText, List, Plus } from 'lucide-react'
+import { BarChart3, FileText, List, Plus } from 'lucide-react'
 import { cn } from '@/utils/utils'
 
 interface LayoutProps {
@@ -11,10 +11,12 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const auth = useAuth()
 
+  // The Dashboard entry is only for pharmacists. Hiding it is a convenience; the backend enforces the role.
   const navItems = [
-    { path: '/', label: 'New Order', icon: Plus },
-    { path: '/orders', label: 'Orders', icon: List },
-  ]
+    { path: '/', label: 'New Order', icon: Plus, pharmacistOnly: false },
+    { path: '/orders', label: 'Orders', icon: List, pharmacistOnly: false },
+    { path: '/dashboard', label: 'Dashboard', icon: BarChart3, pharmacistOnly: true },
+  ].filter((item) => !item.pharmacistOnly || auth.pharmacist)
 
   return (
     <div className="min-h-screen bg-gray-50">

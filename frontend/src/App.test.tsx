@@ -5,7 +5,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { orderService } from '@/services/orderService'
 import { createTestQueryClient } from '@/test/utils'
-import { makeListItem, makeOrder, makePage } from '@/test/fixtures'
+import { dashboardService } from '@/services/dashboardService'
+import { makeDashboardStats, makeListItem, makeOrder, makePage } from '@/test/fixtures'
 import type { AuthState } from '@/auth/auth'
 import App from './App'
 
@@ -27,6 +28,8 @@ vi.mock('@/auth/auth', () => ({
 vi.mock('@/services/orderService', () => ({
   orderService: { getOrders: vi.fn(), getOrder: vi.fn(), getCarePlanStatus: vi.fn() },
 }))
+
+vi.mock('@/services/dashboardService', () => ({ dashboardService: { getStats: vi.fn() } }))
 
 function signedIn(overrides: Partial<AuthState> = {}) {
   auth.state = {
@@ -52,6 +55,7 @@ beforeEach(() => {
   vi.mocked(orderService.getOrders).mockResolvedValue(makePage([makeListItem()]))
   vi.mocked(orderService.getOrder).mockResolvedValue(makeOrder({ id: 7 }))
   vi.mocked(orderService.getCarePlanStatus).mockResolvedValue({ orderId: 7, status: 'completed' })
+  vi.mocked(dashboardService.getStats).mockResolvedValue(makeDashboardStats())
   signedIn()
 })
 
@@ -126,6 +130,54 @@ describe('App layout', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(auth.signOut).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('App dashboard route and navigation (layer 1: UX only; the backend enforces the role)', () => {
+  it('an assistant does not see the Dashboard entry in the navigation', () => {
+    signedIn({ pharmacist: false })
+    renderApp('/orders')
+
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Orders' })).toBeInTheDocument() // the other entries stay
+  })
+
+  it('a pharmacist sees the Dashboard entry', () => {
+    signedIn({ pharmacist: true })
+    renderApp('/orders')
+
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
+  it('an assistant who opens /dashboard directly gets a no-permission message and nothing is requested', async () => {
+    signedIn({ pharmacist: false })
+    renderApp('/dashboard')
+
+    expect(screen.getByText('No permission')).toBeInTheDocument()
+    expect(screen.getByText('The dashboard is available to pharmacists only.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(dashboardService.getStats).not.toHaveBeenCalled()
+  })
+
+  it('a pharmacist gets the dashboard at /dashboard, loaded lazily, with its nav link highlighted', async () => {
+    signedIn({ pharmacist: true })
+    renderApp('/dashboard')
+
+    // The first import() of the page makes Vitest compile Recharts, which takes a few seconds on a cold
+    // cache (in a browser this is the chunk download), so wait longer than the default 1 s here.
+    expect(await screen.findByRole('heading', { name: 'Dashboard' }, { timeout: 15000 })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Total orders' })).toBeInTheDocument()
+    expect(dashboardService.getStats).toHaveBeenCalledWith(7)
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveClass('bg-blue-100')
+  }, 20000)
+
+  it('navigates to the dashboard from the nav link', async () => {
+    signedIn({ pharmacist: true })
+    renderApp('/orders')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Dashboard' }))
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
   })
 })
 
