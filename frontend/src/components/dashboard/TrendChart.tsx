@@ -3,11 +3,14 @@ import type { DashboardDailyTrend } from '@/types'
 import { ChartCard } from './ChartCard'
 import { COLORS } from './colors'
 import {
+    formatDuration,
+    formatMillisTick,
     formatPercent,
     formatPercentTick,
-    formatSeconds,
+    formatSecondsTick,
     formatShortDate,
     formatTrendTooltip,
+    pickDurationUnit,
     TREND_RATE_NAME,
     TREND_SECONDS_NAME,
 } from './format'
@@ -15,6 +18,10 @@ import {
 export function TrendChart({ data }: { data: DashboardDailyTrend[] }) {
     const hasRate = data.some((day) => day.failureRate !== null)
     const hasSeconds = data.some((day) => day.avgGenerationSeconds !== null)
+    // The data stays in seconds; only the axis labels change unit (ms when every day is under a second).
+    const timeTick = pickDurationUnit(data.map((day) => day.avgGenerationSeconds)) === 'ms'
+        ? formatMillisTick
+        : formatSecondsTick
 
     return (
         <ChartCard
@@ -26,7 +33,7 @@ export function TrendChart({ data }: { data: DashboardDailyTrend[] }) {
                 headers: ['Date', 'Avg generation time', 'Failure rate', 'Completed', 'Failed'],
                 rows: data.map((day) => [
                     day.date,
-                    formatSeconds(day.avgGenerationSeconds),
+                    formatDuration(day.avgGenerationSeconds),
                     formatPercent(day.failureRate),
                     day.completedCount,
                     day.failedCount,
@@ -63,7 +70,7 @@ export function TrendChart({ data }: { data: DashboardDailyTrend[] }) {
                 <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                     <CartesianGrid stroke={COLORS.grid} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={formatShortDate} fontSize={12} />
-                    <YAxis yAxisId="seconds" fontSize={12} unit=" s" />
+                    <YAxis yAxisId="seconds" fontSize={12} tickFormatter={timeTick} />
                     <YAxis
                         yAxisId="rate" orientation="right" domain={[0, 1]}
                         tickFormatter={formatPercentTick} fontSize={12}

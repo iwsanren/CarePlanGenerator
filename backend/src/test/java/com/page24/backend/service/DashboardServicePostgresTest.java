@@ -41,6 +41,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * The dashboard aggregates on a real PostgreSQL (production database). Known rows are inserted and every statistic
@@ -263,6 +264,24 @@ class DashboardServicePostgresTest {
         assertThat(stats.kpi().avgGenerationSeconds()).isEqualTo(1.75);
         assertThat(stats.providerStats().get(0).avgGenerationSeconds()).isEqualTo(1.75);
         assertThat(stats.dailyTrend().get(4).avgGenerationSeconds()).isEqualTo(1.75); // 2026-11-12
+    }
+
+    @Test
+    @DisplayName("Millisecond-sized durations (the local mock LLM finishes in 5-70 ms) are kept, not rounded to 0")
+    void keepsMillisecondDurations() {
+        LocalDateTime at = LocalDateTime.of(2026, 11, 12, 10, 0);
+        for (long millis : new long[] {7, 13}) {
+            CarePlan carePlan = newCarePlan(alpha, "Insulin", at, CarePlan.Status.COMPLETED, false);
+            carePlan.setStartedAt(at.plusMinutes(1));
+            carePlan.setFinishedAt(at.plusMinutes(1).plusNanos(millis * 1_000_000));
+            carePlanRepository.save(carePlan);
+        }
+
+        DashboardStatsResponse stats = dashboardService.getStats(7);
+
+        // (0.007 + 0.013) / 2 = 0.010 s; the API stays in seconds, so the UI decides how to show 10 ms
+        assertThat(stats.kpi().avgGenerationSeconds()).isCloseTo(0.010, within(1e-9));
+        assertThat(stats.dailyTrend().get(4).avgGenerationSeconds()).isCloseTo(0.010, within(1e-9));
     }
 
     @Test

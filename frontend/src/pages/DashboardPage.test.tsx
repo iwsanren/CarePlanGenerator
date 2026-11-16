@@ -215,6 +215,25 @@ describe('DashboardPage figures', () => {
     expect(rowOf(table, '2026-11-10')).toEqual(['2026-11-10', 'No data', '50.0%', '0', '1'])
   })
 
+  it('durations under a second (the local mock LLM) are shown in milliseconds, not as 0.0 s', async () => {
+    const base = makeDashboardStats()
+    await renderLoaded({
+      ...base,
+      kpi: { ...base.kpi, avgGenerationSeconds: 0.0066 },
+      dailyTrend: base.dailyTrend.map((day) =>
+        day.avgGenerationSeconds === null ? day : { ...day, avgGenerationSeconds: 0.0123 }),
+      providerStats: base.providerStats.map((row) =>
+        row.avgGenerationSeconds === null ? row : { ...row, avgGenerationSeconds: 0.0456 }),
+    })
+
+    expect(within(screen.getByRole('group', { name: 'Avg generation time' })).getByText('7 ms')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Generation time and failure rate' })
+    expect(rowOf(table, '2026-11-08')).toEqual(['2026-11-08', '12 ms', '0.0%', '2', '0'])
+    const rows = within(screen.getByRole('region', { name: 'Providers' })).getAllByRole('row')
+    expect(within(rows[1]).getAllByRole('cell')[3]).toHaveTextContent('46 ms')
+    expect(screen.queryByText('0.0 s')).not.toBeInTheDocument()
+  })
+
   it('top medications: a summary and the names with their counts', async () => {
     await renderLoaded()
 

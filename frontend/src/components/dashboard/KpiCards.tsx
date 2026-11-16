@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { DashboardStats } from '@/types'
-import { formatPercent, formatSeconds } from './format'
+import { formatDuration, formatPercent } from './format'
 
 function KpiCard({ label, value, hint }: { label: string; value: ReactNode; hint: string }) {
     return (
@@ -42,7 +42,7 @@ export function KpiCards({ stats }: { stats: DashboardStats }) {
             />
             <KpiCard
                 label="Avg generation time"
-                value={formatSeconds(stats.kpi.avgGenerationSeconds)}
+                value={formatDuration(stats.kpi.avgGenerationSeconds)}
                 hint="Completed LLM generations, including retries"
             />
         </section>

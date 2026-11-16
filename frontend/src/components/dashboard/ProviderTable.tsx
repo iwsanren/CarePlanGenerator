@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { DashboardProviderStats } from '@/types'
 import { cn } from '@/utils/utils'
-import { formatSeconds } from './format'
+import { formatDuration } from './format'
 import { defaultDirection, sortProviders, type ProviderSort, type ProviderSortKey } from './providerSort'
 
 const COLUMNS: { key: ProviderSortKey; label: string; numeric: boolean }[] = [
@@ -64,7 +64,7 @@ export function ProviderTable({ data }: { data: DashboardProviderStats[] }) {
                                 <td className="px-3 py-2 text-right text-sm tabular-nums">{row.orderCount}</td>
                                 <td className="px-3 py-2 text-right text-sm tabular-nums">{row.failedCount}</td>
                                 <td className="px-3 py-2 text-right text-sm tabular-nums">
-                                    {formatSeconds(row.avgGenerationSeconds)}
+                                    {formatDuration(row.avgGenerationSeconds)}
                                 </td>
                             </tr>
                         ))}
