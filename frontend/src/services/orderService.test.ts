@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import axios from 'axios'
 import api from '@/services/api'
 import { downloadFile } from './download'
 import { orderService } from './orderService'
@@ -49,6 +50,48 @@ describe('getOrders', () => {
     await orderService.getOrders()
 
     expect(http.get).toHaveBeenCalledWith('/orders', { params: {} })
+  })
+
+  it('passes every search parameter through unchanged, with sort as ONE string', async () => {
+    http.get.mockResolvedValue({ data: makePage([]) })
+    const params = {
+      page: 2, page_size: 20, status: 'failed' as const, patient_name: 'Jane', mrn: '123456', medication: 'IVIG',
+      provider_name: 'Dr. Green', created_from: '2026-11-01', created_to: '2026-11-30', sort: 'created_at,desc',
+    }
+
+    await orderService.getOrders(params)
+
+    expect(http.get).toHaveBeenCalledWith('/orders', { params })
+  })
+})
+
+// services/api.ts is a plain axios.create() with no custom paramsSerializer, so the default serializer of plain
+// axios is the one that writes the real query string. getUri builds the URL without sending anything.
+describe('how axios writes the search parameters into the URL', () => {
+  it('writes sort as sort=created_at,desc, which is what the backend reads', () => {
+    const url = axios.getUri({
+      url: '/orders',
+      params: { page: 1, page_size: 20, status: 'failed', sort: 'created_at,desc' },
+    })
+
+    expect(url).toBe('/orders?page=1&page_size=20&status=failed&sort=created_at,desc')
+  })
+
+  it('would write an array as sort[]=... (brackets URL-encoded), which the backend does NOT read', () => {
+    const url = axios.getUri({ url: '/orders', params: { sort: ['status,asc', 'created_at,desc'] } })
+
+    // This is why the page sends ONE sort string: the backend reads the name "sort", not "sort[]".
+    expect(url).toBe('/orders?sort%5B%5D=status,asc&sort%5B%5D=created_at,desc')
+    expect(url).not.toMatch(/[?&]sort=/)
+  })
+
+  it('encodes spaces and punctuation in the texts, and leaves a missing parameter out', () => {
+    const url = axios.getUri({
+      url: '/orders',
+      params: { medication: 'Gamunex-C', provider_name: 'Dr. Green & Co', created_from: undefined },
+    })
+
+    expect(url).toBe('/orders?medication=Gamunex-C&provider_name=Dr.+Green+%26+Co')
   })
 })
 

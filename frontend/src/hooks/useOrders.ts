@@ -24,8 +24,11 @@ export function isNotFoundError(error: unknown): boolean {
  * useOrders — the single bridge between components and orderService,
  * and the only place in the frontend that needs to know react-query exists.
  * Usage: const { data, isLoading, isError, error } = useOrders(params)
+ *
+ * `enabled` false sends nothing: the list page uses it while the filters on screen are invalid, so a request
+ * the backend would answer with a 400 is never made. The last good result stays on screen (placeholder data).
  */
-export function useOrders(params: OrderListParams = {}) {
+export function useOrders(params: OrderListParams = {}, enabled = true) {
     return useQuery({
         // Cache key: when params change (pagination / filters), the key changes and data is refetched.
         // If the key stays the same, react-query serves the cached result.
@@ -33,6 +36,8 @@ export function useOrders(params: OrderListParams = {}) {
 
         // The function that actually fetches the data
         queryFn: () => orderService.getOrders(params),
+
+        enabled,
 
         // Improves the pagination experience: keep showing the previous page while the next loads
         placeholderData: keepPreviousData,

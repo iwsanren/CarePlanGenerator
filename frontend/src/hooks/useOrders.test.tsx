@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { orderService } from '@/services/orderService'
 import { createTestQueryClient, queryWrapper } from '@/test/utils'
 import { makeApiError, makeListItem, makeOrder, makePage } from '@/test/fixtures'
+import type { OrderListParams } from '@/types'
 import {
   isBlockedError,
   isConfirmationRequiredError,
@@ -74,6 +75,49 @@ describe('useOrders', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(service.getOrders).toHaveBeenCalledWith({})
+  })
+
+  it('sends nothing while it is disabled, and fetches as soon as it is enabled', async () => {
+    service.getOrders.mockResolvedValue(makePage([makeListItem()]))
+    const { result, rerender } = renderHook(({ enabled }) => useOrders({ page: 1 }, enabled), {
+      wrapper: queryWrapper(createTestQueryClient()),
+      initialProps: { enabled: false },
+    })
+
+    // nothing is requested: no data, not loading, and the service was never called
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(service.getOrders).not.toHaveBeenCalled()
+    expect(result.current.data).toBeUndefined()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.fetchStatus).toBe('idle')
+
+    rerender({ enabled: true })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(service.getOrders).toHaveBeenCalledTimes(1)
+  })
+
+  it('is enabled by default', async () => {
+    service.getOrders.mockResolvedValue(makePage([]))
+    renderHook(() => useOrders({ page: 1 }), { wrapper: queryWrapper(createTestQueryClient()) })
+
+    await waitFor(() => expect(service.getOrders).toHaveBeenCalledTimes(1))
+  })
+
+  it('keeps the last good result on screen when it is disabled by params that are invalid', async () => {
+    const good = makePage([makeListItem({ id: 1 })])
+    service.getOrders.mockResolvedValue(good)
+    const initialProps: { params: OrderListParams; enabled: boolean } = { params: { page: 1 }, enabled: true }
+    const { result, rerender } = renderHook(
+      ({ params, enabled }) => useOrders(params, enabled),
+      { wrapper: queryWrapper(createTestQueryClient()), initialProps },
+    )
+    await waitFor(() => expect(result.current.data).toEqual(good))
+
+    rerender({ params: { page: 1, mrn: '12' }, enabled: false }) // the user typed a bad MRN
+
+    expect(result.current.data).toEqual(good) // still the old rows (placeholder data)
+    expect(service.getOrders).toHaveBeenCalledTimes(1) // and no request for the bad one
   })
 
   it('keeps showing the previous page (placeholder data) while the next page loads', async () => {

@@ -101,14 +101,29 @@ export interface CarePlanStatus {
     errorMessage?: string
 }
 
-/** Query parameters for GET /orders; these query param names remain snake_case on the backend */
+/**
+ * Query parameters for GET /orders; these query param names remain snake_case on the backend.
+ * All are optional and the backend ANDs the ones that are given. A parameter that is not wanted must be left
+ * out, not sent as an empty string.
+ */
 export interface OrderListParams {
-    page?: number
-    page_size?: number
+    page?: number                     // from 1
+    page_size?: number                // 1..100
     status?: OrderStatus
     patient_id?: number
     provider_id?: number
-    patient_name?: string
+    patient_name?: string             // part of the first name, last name or "first last", any case
+    mrn?: string                      // exact match, 6 digits
+    medication?: string               // part of the medication name, any case
+    provider_name?: string            // part of the provider's name, any case
+    created_from?: string             // yyyy-MM-dd, a UTC calendar day, included
+    created_to?: string               // yyyy-MM-dd, a UTC calendar day, included; not before created_from
+    /**
+     * "field,direction", for example "created_at,desc". ONE string on purpose: axios would write an array as
+     * sort[]=a&sort[]=b, which the backend does not read. Fields: id, created_at, medication, patient_name,
+     * provider_name, status. Without it the newest orders come first.
+     */
+    sort?: string
 }
 
 // ---- GET /dashboard/stats (pharmacist only) ----------------------------------------------
