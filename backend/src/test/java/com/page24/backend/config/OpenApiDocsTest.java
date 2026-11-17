@@ -96,6 +96,35 @@ class OpenApiDocsTest {
     }
 
     @Test
+    @DisplayName("The order list documents every filter, the sort format and the 400 response; /search is deprecated")
+    void orderListEndpointIsDocumented() throws Exception {
+        String list = "$.paths['/api/v1/orders'].get";
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(list + ".parameters[*].name").value(org.hamcrest.Matchers.hasItems(
+                        "page", "page_size", "status", "patient_id", "provider_id", "patient_name", "mrn",
+                        "medication", "provider_name", "created_from", "created_to", "sort")))
+                .andExpect(jsonPath(list + ".parameters[?(@.name=='sort')].description").value(
+                        org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("field,desc"),
+                                org.hamcrest.Matchers.containsString("patient_name"),
+                                org.hamcrest.Matchers.containsString("at most once")))))
+                .andExpect(jsonPath(list + ".parameters[?(@.name=='sort')].schema.type").value(
+                        org.hamcrest.Matchers.hasItem("array")))
+                .andExpect(jsonPath(list + ".parameters[?(@.name=='created_from')].schema.format").value(
+                        org.hamcrest.Matchers.hasItem("date")))
+                .andExpect(jsonPath(list + ".parameters[?(@.name=='page_size')].description").value(
+                        org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("1 to 100"))))
+                .andExpect(jsonPath(list + ".parameters[?(@.name=='status')].schema.enum[*]").value(
+                        org.hamcrest.Matchers.hasItems("pending", "processing", "completed", "failed")))
+                .andExpect(jsonPath(list + ".responses['400']").exists())
+                .andExpect(jsonPath(list + ".responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/orders/search'].get.deprecated").value(true))
+                .andExpect(jsonPath("$.paths['/api/v1/orders/search'].get.description")
+                        .value(org.hamcrest.Matchers.containsString("DEPRECATED")));
+    }
+
+    @Test
     @DisplayName("Swagger UI is public when docs are enabled")
     void swaggerUiIsPublic() throws Exception {
         mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());

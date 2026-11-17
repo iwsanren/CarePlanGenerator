@@ -274,8 +274,9 @@ LLM calls are retried up to 3 times with exponential backoff (`CarePlanGeneratio
 # Create order (triggers care plan generation)
 POST /api/v1/orders
 
-# List orders (paginated; optional filters: status, patient_id, provider_id, patient_name)
+# List orders: filter, sort, paginate (see "Listing and searching orders" below)
 GET /api/v1/orders
+GET /api/v1/orders?status=completed&created_from=2026-11-01&sort=created_at,desc&page_size=50
 
 # Get order details
 GET /api/v1/orders/{id}
@@ -283,7 +284,7 @@ GET /api/v1/orders/{id}
 # Get care plan generation status (for polling)
 GET /api/v1/orders/{id}/status
 
-# Search orders
+# DEPRECATED, use GET /api/v1/orders with patient_name or mrn (this one is not paginated)
 GET /api/v1/orders/search?patient_name=John
 GET /api/v1/orders/search?mrn=123456
 
@@ -298,6 +299,26 @@ GET /api/v1/orders/{id}/careplan/download
 ```
 
 `regenerate` and `careplan/upload` return a business error while a generation is already `PROCESSING` for that order. `careplan/download` returns a business error unless the care plan is `COMPLETED`.
+
+#### Listing and searching orders
+
+`GET /api/v1/orders` takes these optional query parameters. All given filters must match (AND).
+
+| Parameter | Meaning |
+|---|---|
+| `page`, `page_size` | Page number from 1 (default 1); rows per page, 1 to 100 (default 20) |
+| `status` | Care plan status: `pending`, `processing`, `completed`, `failed` |
+| `created_from`, `created_to` | First and last day to include, `yyyy-MM-dd`, UTC calendar days; `created_from` must not be after `created_to` |
+| `medication` | Part of the medication name (case-insensitive) |
+| `provider_id`, `provider_name` | Provider id; part of the provider's name (case-insensitive) |
+| `patient_id`, `patient_name`, `mrn` | Patient id; part of the first name, last name or "first last" (case-insensitive); exact MRN |
+| `sort` | `field`, `field,asc` or `field,desc`. Repeat the parameter for more than one (the first has the highest priority). Fields: `id`, `created_at`, `medication`, `patient_name` (last name, then first name), `provider_name`, `status` (alphabetical). Each field at most once. |
+
+- Without `sort`, the newest orders come first. Rows that tie on every sort key are ordered by id, newest first, so paging never repeats or skips a row.
+- Text filters are at most 100 characters, and `%` and `_` in them are ordinary characters, not wildcards.
+- A page past the last one returns an empty `results` and the real `count`.
+- A bad parameter returns `400` in the usual error format, for example `INVALID_SORT`, `INVALID_DATE_RANGE`, `INVALID_PAGE_SIZE`. The message never repeats the value you sent, because filters can be a patient name or an MRN.
+- Names and MRNs are sent in the URL query string, so they can appear in the access logs of a reverse proxy in front of the API. Keep those logs as protected as the data itself.
 
 ### Create Order Request Body
 

@@ -13,7 +13,12 @@ import com.page24.backend.exception.CarePlanNotReadyException;
 import com.page24.backend.exception.OrderNotFoundException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.repository.OrderListQuery;
+import com.page24.backend.repository.OrderListRow;
 import com.page24.backend.repository.OrderRepository;
+import com.page24.backend.repository.OrderSearchPage;
+import com.page24.backend.repository.OrderSortField;
+import com.page24.backend.repository.OrderSortKey;
 import com.page24.backend.repository.PatientRepository;
 import com.page24.backend.repository.ProviderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,10 +30,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
@@ -130,10 +131,13 @@ class OrderServiceQueryUnitTest {
 
     // ----- getOrders -----
 
+    // The rules of every parameter (ranges, whitelist, messages) are tested one by one in OrderListQueryParserTest;
+    // here only the service's own part: it parses first, queries once, and maps the rows.
+
     @Test
     @DisplayName("page below 1 -> INVALID_PAGE and the repository is never queried")
     void rejectsPageZero() {
-        Throwable thrown = catchThrowable(() -> orderService.getOrders(0, 10, null, null, null, null));
+        Throwable thrown = catchThrowable(() -> orderService.getOrders(OrderListParams.builder().page(0).build()));
 
         assertThat(thrown).isInstanceOf(ValidationError.class);
         assertThat(((ValidationError) thrown).getCode()).isEqualTo("INVALID_PAGE");
@@ -143,7 +147,8 @@ class OrderServiceQueryUnitTest {
     @Test
     @DisplayName("page_size below 1 -> INVALID_PAGE_SIZE and the repository is never queried")
     void rejectsPageSizeZero() {
-        Throwable thrown = catchThrowable(() -> orderService.getOrders(1, 0, null, null, null, null));
+        Throwable thrown = catchThrowable(
+                () -> orderService.getOrders(OrderListParams.builder().pageSize(0).build()));
 
         assertThat(thrown).isInstanceOf(ValidationError.class);
         assertThat(((ValidationError) thrown).getCode()).isEqualTo("INVALID_PAGE_SIZE");
@@ -151,58 +156,73 @@ class OrderServiceQueryUnitTest {
     }
 
     @Test
-    @DisplayName("Page 2 of size 5 -> zero-based page index, newest first, total count from the repository")
-    void translatesThePageParametersIntoAnOrderedPageRequest() {
-        order.setCreatedAt(LocalDateTime.of(2026, 1, 2, 3, 4, 5));
-        when(orderRepository.findByFilters(any(), any(), any(), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(1, 5), 11));
-        when(carePlanRepository.findByOrderId(ORDER_ID))
-                .thenReturn(Optional.of(carePlan(order, CarePlan.Status.COMPLETED, "plan")));
+    @DisplayName("An invalid sort is rejected before the repository is touched")
+    void rejectsAnInvalidSortWithoutQuerying() {
+        Throwable thrown = catchThrowable(() -> orderService.getOrders(
+                OrderListParams.builder().sort(List.of("password,asc")).build()));
 
-        PagedOrderResponse response = orderService.getOrders(2, 5, null, null, null, null);
+        assertThat(thrown).isInstanceOf(ValidationError.class);
+        assertThat(((ValidationError) thrown).getCode()).isEqualTo("INVALID_SORT");
+        verifyNoInteractions(orderRepository);
+    }
 
-        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(orderRepository).findByFilters(any(), any(), any(), any(), pageable.capture());
-        assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
-        assertThat(pageable.getValue().getPageSize()).isEqualTo(5);
-        assertThat(pageable.getValue().getSort().stream().map(o -> o.getProperty() + ":" + o.getDirection()))
-                .containsExactly("createdAt:" + Sort.Direction.DESC, "id:" + Sort.Direction.DESC);
+    @Test
+    @DisplayName("Page 2 of size 5 -> the query asks for offset 5, newest first; count comes from the repository")
+    void passesAParsedQueryToTheRepositoryAndMapsTheRows() {
+        OrderListRow row = new OrderListRow(ORDER_ID, "Alice", "Wong", "123456", "IVIG",
+                CarePlan.Status.COMPLETED, LocalDateTime.of(2026, 1, 2, 3, 4, 5), "Dr. Green", "1111111111");
+        when(orderRepository.search(any(OrderListQuery.class))).thenReturn(new OrderSearchPage(11, List.of(row)));
+
+        PagedOrderResponse response = orderService.getOrders(OrderListParams.builder().page(2).pageSize(5).build());
+
+        ArgumentCaptor<OrderListQuery> query = ArgumentCaptor.forClass(OrderListQuery.class);
+        verify(orderRepository).search(query.capture());
+        assertThat(query.getValue().page()).isEqualTo(2);
+        assertThat(query.getValue().pageSize()).isEqualTo(5);
+        assertThat(query.getValue().offset()).isEqualTo(5);
+        assertThat(query.getValue().sort()).containsExactly(
+                new OrderSortKey(OrderSortField.CREATED_AT, false), new OrderSortKey(OrderSortField.ID, false));
 
         assertThat(response.getCount()).isEqualTo(11);
         assertThat(response.getPage()).isEqualTo(2);
         assertThat(response.getPageSize()).isEqualTo(5);
         assertThat(response.getResults()).hasSize(1);
+        assertThat(response.getResults().get(0).getId()).isEqualTo(ORDER_ID);
         assertThat(response.getResults().get(0).getPatientName()).isEqualTo("Alice Wong");
+        assertThat(response.getResults().get(0).getPatientMrn()).isEqualTo("123456");
         assertThat(response.getResults().get(0).getStatus()).isEqualTo("completed");
+        assertThat(response.getResults().get(0).getProviderName()).isEqualTo("Dr. Green");
+        assertThat(response.getResults().get(0).getProviderNpi()).isEqualTo("1111111111");
+        assertThat(response.getResults().get(0).getCreatedAt())
+                .isEqualTo(LocalDateTime.of(2026, 1, 2, 3, 4, 5).toInstant(java.time.ZoneOffset.UTC));
+        // the list no longer asks the care plan repository per row (that was one query per order)
+        verifyNoInteractions(carePlanRepository);
     }
 
     @Test
-    @DisplayName("An order that has no care plan row is listed as pending")
-    void listsAnOrderWithoutACarePlanAsPending() {
-        order.setCreatedAt(LocalDateTime.of(2026, 1, 2, 3, 4, 5));
-        when(orderRepository.findByFilters(any(), any(), any(), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(order)));
-        when(carePlanRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.empty());
+    @DisplayName("A page past the end -> empty results and the real total")
+    void keepsTheTotalWhenThePageIsEmpty() {
+        when(orderRepository.search(any(OrderListQuery.class))).thenReturn(new OrderSearchPage(3, List.of()));
 
-        PagedOrderResponse response = orderService.getOrders(1, 10, null, null, null, null);
+        PagedOrderResponse response = orderService.getOrders(OrderListParams.builder().page(9).build());
 
-        assertThat(response.getResults()).extracting("status").containsExactly("pending");
+        assertThat(response.getCount()).isEqualTo(3);
+        assertThat(response.getResults()).isEmpty();
     }
 
     @Test
-    @DisplayName("Patient name filter is trimmed and lower-cased into a LIKE pattern; blank means no filter")
+    @DisplayName("Patient name filter is trimmed, lower-cased and escaped into a LIKE pattern; blank means no filter")
     void buildsThePatientNamePatternFromTheFilter() {
-        when(orderRepository.findByFilters(any(), any(), any(), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        when(orderRepository.search(any(OrderListQuery.class))).thenReturn(new OrderSearchPage(0, List.of()));
 
-        orderService.getOrders(1, 10, null, null, null, "  SmItH ");
-        orderService.getOrders(1, 10, null, null, null, "   ");
-        orderService.getOrders(1, 10, null, null, null, null);
+        orderService.getOrders(OrderListParams.builder().patientName("  SmItH ").build());
+        orderService.getOrders(OrderListParams.builder().patientName("   ").build());
+        orderService.getOrders(OrderListParams.builder().build());
 
-        ArgumentCaptor<String> pattern = ArgumentCaptor.forClass(String.class);
-        verify(orderRepository, times(3))
-                .findByFilters(any(), any(), any(), pattern.capture(), any(Pageable.class));
-        assertThat(pattern.getAllValues()).containsExactly("%smith%", null, null);
+        ArgumentCaptor<OrderListQuery> query = ArgumentCaptor.forClass(OrderListQuery.class);
+        verify(orderRepository, times(3)).search(query.capture());
+        assertThat(query.getAllValues()).extracting(OrderListQuery::patientNamePattern)
+                .containsExactly("%smith%", null, null);
     }
 
     // ----- searchOrders -----

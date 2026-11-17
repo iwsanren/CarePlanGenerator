@@ -2,6 +2,7 @@ package com.page24.backend.dto;
 
 import com.page24.backend.entity.CarePlan;
 import com.page24.backend.entity.Order;
+import com.page24.backend.repository.OrderListRow;
 import org.springframework.stereotype.Component;
 
 import java.time.ZoneOffset;
@@ -55,22 +56,18 @@ public class OrderMapper {
     }
 
     /** Maps an order to the smaller shape required by GET /api/orders. */
-    public OrderListItemResponse toListItemResponse(Order order, CarePlan carePlan) {
-        String patientName = String.format("%s %s",
-                order.getPatient().getFirstName(), order.getPatient().getLastName()).trim();
-        String status = carePlan == null
-                ? "pending"
-                : carePlan.getStatus().name().toLowerCase(Locale.ROOT);
+    public OrderListItemResponse toListItemResponse(OrderListRow row) {
+        String patientName = String.format("%s %s", row.patientFirstName(), row.patientLastName()).trim();
 
         return new OrderListItemResponse(
-                order.getId(),
+                row.id(),
                 patientName,
-                order.getPatient().getMrn(),
-                order.getMedicationName(),
-                status,
-                order.getCreatedAt().atOffset(ZoneOffset.UTC).toInstant(),
-                order.getProvider().getName(),
-                order.getProvider().getNpi()
+                row.patientMrn(),
+                row.medicationName(),
+                row.status().name().toLowerCase(Locale.ROOT),
+                row.createdAt().atOffset(ZoneOffset.UTC).toInstant(),
+                row.providerName(),
+                row.providerNpi()
         );
     }
 }

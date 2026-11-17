@@ -18,14 +18,13 @@ import com.page24.backend.exception.OrderNotFoundException;
 import com.page24.backend.exception.ValidationError;
 import com.page24.backend.exception.WarningException;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.repository.OrderListQuery;
 import com.page24.backend.repository.OrderRepository;
+import com.page24.backend.repository.OrderSearchPage;
 import com.page24.backend.repository.PatientRepository;
 import com.page24.backend.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.page24.backend.security.Audited;
@@ -388,40 +387,19 @@ public class OrderService {
         return orderMapper.toResponse(order, carePlan);
     }
 
-    /** Query orders with pagination and optional filters, which can be combined. */
-    public PagedOrderResponse getOrders(
-            int page,
-            int pageSize,
-            String status,
-            Long patientId,
-            Long providerId,
-            String patientName
-    ) {
-        if (page < 1) {
-            throw new ValidationError("INVALID_PAGE", "page must be greater than or equal to 1");
-        }
-        if (pageSize < 1) {
-            throw new ValidationError("INVALID_PAGE_SIZE", "page_size must be greater than or equal to 1");
-        }
-        validatePositiveId(patientId, "patient_id", "INVALID_PATIENT_ID");
-        validatePositiveId(providerId, "provider_id", "INVALID_PROVIDER_ID");
-
-        CarePlan.Status statusFilter = parseStatus(status);
-        String patientNamePattern = buildPatientNamePattern(patientName);
-
-        PageRequest pageRequest = PageRequest.of(
-                page - 1,
-                pageSize,
-                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
-        );
-
-        Page<Order> orders = orderRepository.findByFilters(
-                statusFilter, patientId, providerId, patientNamePattern, pageRequest);
-        List<OrderListItemResponse> results = orders.getContent().stream()
-                .map(this::toListItemResponse)
-                .collect(Collectors.toList());
-
-        return new PagedOrderResponse(orders.getTotalElements(), page, pageSize, results);
+    /**
+     * One page of orders. Every filter is optional and they are ANDed; the sort and the page size are checked
+     * first (OrderListQueryParser). The repository then runs two SQL statements, whatever the page size.
+     *
+     * Deliberately no logging here: the filters can be a patient name or an MRN.
+     */
+    public PagedOrderResponse getOrders(OrderListParams params) {
+        OrderListQuery query = OrderListQueryParser.parse(params);
+        OrderSearchPage found = orderRepository.search(query);
+        List<OrderListItemResponse> results = found.rows().stream()
+                .map(orderMapper::toListItemResponse)
+                .toList();
+        return new PagedOrderResponse(found.total(), query.page(), query.pageSize(), results);
     }
 
     /**
@@ -492,48 +470,6 @@ public class OrderService {
             return content;
         }
         return content.substring(0, CARE_PLAN_PREVIEW_LENGTH) + "...";
-    }
-
-    private OrderListItemResponse toListItemResponse(Order order) {
-        CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElse(null);
-        return orderMapper.toListItemResponse(order, carePlan);
-    }
-
-    private void validatePositiveId(Long id, String parameterName, String errorCode) {
-        if (id != null && id < 1) {
-            throw new ValidationError(errorCode, parameterName + " must be greater than or equal to 1");
-        }
-    }
-
-    private CarePlan.Status parseStatus(String status) {
-        String normalized = normalizeBlankToNull(status);
-        if (normalized == null) {
-            return null;
-        }
-
-        try {
-            return CarePlan.Status.valueOf(normalized.toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new ValidationError(
-                    "INVALID_STATUS",
-                    "status must be one of: pending, processing, completed, failed"
-            );
-        }
-    }
-
-    private String buildPatientNamePattern(String patientName) {
-        String normalized = normalizeBlankToNull(patientName);
-        if (normalized == null) {
-            return null;
-        }
-        return "%" + normalized.toLowerCase(Locale.ROOT) + "%";
-    }
-
-    private String normalizeBlankToNull(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return null;
-        }
-        return value.trim();
     }
 
     /**
