@@ -1,6 +1,6 @@
 import { useAuth } from '@/auth/auth'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Download, Loader2, RefreshCw, Upload } from 'lucide-react'
 
@@ -16,10 +16,25 @@ import { UploadCarePlanModal } from '@/components/modals/UploadCarePlanModal'
 import { Button } from '@/components/ui/Button'
 import { cn, getStatusColor } from '@/utils/utils'
 import type { OrderResponse } from '@/types'
+import { ordersListPath } from '@/utils/orderSearchUrl'
 
 /* ------------------------------------------------------------------ */
 /* Small building blocks                                               */
 /* ------------------------------------------------------------------ */
+
+/**
+ * "← Back to orders". When the order was opened from the list, the router state holds the list's query, so this
+ * returns to the same filtered, sorted page. Opened directly (no state), it goes to the bare /orders.
+ * It does not touch the in-memory patient name / MRN: those are cleared only by the "Orders" nav link.
+ */
+function BackToOrdersLink({ className }: { className: string }) {
+    const { state } = useLocation()
+    return (
+        <Link to={ordersListPath(state)} className={className}>
+            ← Back to orders
+        </Link>
+    )
+}
 
 /** A white rounded panel used for each section of the page. */
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -64,9 +79,7 @@ function NotFoundCard() {
     return (
         <div className="rounded-lg bg-white p-8 text-center shadow">
             <p className="mb-4 text-gray-500">Order not found</p>
-            <Link to="/orders" className="text-blue-600 hover:underline">
-                ← Back to orders
-            </Link>
+            <BackToOrdersLink className="text-blue-600 hover:underline" />
         </div>
     )
 }
@@ -210,12 +223,7 @@ export function OrderDetailPage() {
                 <p className="text-red-700">
                     Something went wrong loading this order: {error?.message}
                 </p>
-                <Link
-                    to="/orders"
-                    className="mt-2 inline-block text-sm text-blue-600 hover:underline"
-                >
-                    ← Back to orders
-                </Link>
+                <BackToOrdersLink className="mt-2 inline-block text-sm text-blue-600 hover:underline" />
             </div>
         )
     }
@@ -236,9 +244,7 @@ export function OrderDetailPage() {
             </p>}
             {/* Header: back link + order number + status badge */}
             <div>
-                <Link to="/orders" className="text-sm text-blue-600 hover:underline">
-                    ← Back to orders
-                </Link>
+                <BackToOrdersLink className="text-sm text-blue-600 hover:underline" />
                 <div className="mt-1 flex items-center gap-3">
                     <h1 className="text-2xl font-bold">Order #{order.id}</h1>
                     <span

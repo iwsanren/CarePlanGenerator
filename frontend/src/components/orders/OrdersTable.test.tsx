@@ -101,6 +101,51 @@ describe('OrdersTable: rows', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/orders/9')
   })
 
+  describe('the order remembers the list it was opened from', () => {
+    function SavedQuery() {
+      const state = useLocation().state as { ordersSearch?: string } | null
+      return <div data-testid="saved">{state === null ? 'no state' : String(state.ordersSearch)}</div>
+    }
+
+    function renderFrom(route: string) {
+      render(
+        <MemoryRouter initialEntries={[route]}>
+          <Routes>
+            <Route
+              path="/orders"
+              element={<OrdersTable orders={[makeListItem({ id: 5, patientName: 'Jane Doe' })]} sort={null} onSort={vi.fn()} dimmed={false} />}
+            />
+            <Route path="/orders/:id" element={<SavedQuery />} />
+          </Routes>
+        </MemoryRouter>,
+      )
+    }
+
+    it('a click on the row passes the list\'s query on', async () => {
+      renderFrom('/orders?status=failed&page=2')
+
+      await userEvent.click(screen.getByText('IVIG'))
+
+      expect(screen.getByTestId('saved')).toHaveTextContent('?status=failed&page=2')
+    })
+
+    it('a click on the patient link passes it on too', async () => {
+      renderFrom('/orders?medication=ivig&sort=status%2Casc')
+
+      await userEvent.click(screen.getByRole('link', { name: 'Jane Doe' }))
+
+      expect(screen.getByTestId('saved')).toHaveTextContent('?medication=ivig&sort=status%2Casc')
+    })
+
+    it('a list without parameters passes an empty query', async () => {
+      renderFrom('/orders')
+
+      await userEvent.click(screen.getByRole('link', { name: 'Jane Doe' }))
+
+      expect(screen.getByTestId('saved').textContent).toBe('')
+    })
+  })
+
   it('the table scrolls sideways on a narrow screen instead of being cut off', () => {
     const { container } = renderTable([makeListItem()])
 

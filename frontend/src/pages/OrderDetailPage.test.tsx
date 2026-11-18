@@ -83,6 +83,72 @@ describe('OrderDetailPage: loading and failures', () => {
   })
 })
 
+// The list puts its query into the router state of the link to an order (OrdersTable); the three "Back to orders"
+// links return to it. The tests above cover an order opened directly (no state): the bare /orders.
+describe('OrderDetailPage: "Back to orders" returns to the list the order was opened from', () => {
+  const FROM_LIST = { pathname: '/orders/7', state: { ordersSearch: '?status=failed&sort=created_at%2Cdesc&page=2' } }
+  const LIST_URL = '/orders?status=failed&sort=created_at%2Cdesc&page=2'
+  const back = () => screen.getByRole('link', { name: '← Back to orders' })
+
+  it('the order page: the link carries the list\'s query', async () => {
+    serve(makeOrder({ id: 7 }))
+    renderPage(<OrderDetailPage />, { route: FROM_LIST, path: '/orders/:id' })
+
+    await screen.findByRole('heading', { name: 'Order #7' })
+
+    expect(back()).toHaveAttribute('href', LIST_URL)
+  })
+
+  it('"Order not found": the link carries it too', () => {
+    renderPage(<OrderDetailPage />, {
+      route: { pathname: '/orders/abc', state: FROM_LIST.state }, path: '/orders/:id',
+    })
+
+    expect(back()).toHaveAttribute('href', LIST_URL)
+  })
+
+  it('the error page: the link carries it too', async () => {
+    service.getOrder.mockRejectedValue(makeApiError('Database unavailable', { status: 500 }))
+    service.getCarePlanStatus.mockRejectedValue(makeApiError('Database unavailable', { status: 500 }))
+    renderPage(<OrderDetailPage />, { route: FROM_LIST, path: '/orders/:id' })
+
+    await screen.findByText(/Something went wrong loading this order/)
+
+    expect(back()).toHaveAttribute('href', LIST_URL)
+  })
+
+  it('a list that had no parameters gives the bare /orders', async () => {
+    serve(makeOrder({ id: 7 }))
+    renderPage(<OrderDetailPage />, { route: { pathname: '/orders/7', state: { ordersSearch: '' } }, path: '/orders/:id' })
+
+    await screen.findByRole('heading', { name: 'Order #7' })
+
+    expect(back()).toHaveAttribute('href', '/orders')
+  })
+
+  it('what the state holds is read again through the whitelist: patient fields and junk are not linked', async () => {
+    serve(makeOrder({ id: 7 }))
+    renderPage(<OrderDetailPage />, {
+      route: { pathname: '/orders/7', state: { ordersSearch: '?patient_name=Jane&mrn=123456&sort=password&status=pending' } },
+      path: '/orders/:id',
+    })
+
+    await screen.findByRole('heading', { name: 'Order #7' })
+
+    expect(back()).toHaveAttribute('href', '/orders?status=pending')
+  })
+
+  it('clicking it goes to the list', async () => {
+    serve(makeOrder({ id: 7 }))
+    renderPage(<OrderDetailPage />, { route: FROM_LIST, path: '/orders/:id' })
+    await screen.findByRole('heading', { name: 'Order #7' })
+
+    await userEvent.click(back())
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/orders')
+  })
+})
+
 describe('OrderDetailPage: order details', () => {
   it('shows the header, the order card, the patient card and the provider card', async () => {
     serve(makeOrder({ id: 7, status: 'completed', resultType: 'SUCCESS' }))

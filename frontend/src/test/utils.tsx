@@ -1,7 +1,10 @@
 import type { ReactElement, ReactNode } from 'react'
 import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, type MemoryRouterProps } from 'react-router-dom'
+
+/** A starting point of the in-memory router: a URL, or a URL with router state (what a Link's `state` leaves). */
+type RouterEntry = NonNullable<MemoryRouterProps['initialEntries']>[number]
 
 /** A QueryClient for tests: no cache sharing between tests, retries are instant. */
 export function createTestQueryClient() {
@@ -36,7 +39,7 @@ function LocationProbe() {
  */
 export function renderPage(
   ui: ReactElement,
-  { route = '/', path = '/', client = createTestQueryClient() } = {},
+  { route = '/', path = '/', client = createTestQueryClient() }: { route?: RouterEntry; path?: string; client?: QueryClient } = {},
 ) {
   const result = render(
     <QueryClientProvider client={client}>

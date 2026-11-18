@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -178,6 +178,93 @@ describe('App dashboard route and navigation (layer 1: UX only; the backend enfo
     await userEvent.click(screen.getByRole('link', { name: 'Dashboard' }))
 
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+  })
+})
+
+// The order list search lives in the URL (status, dates, medication, provider, sort, page) and in the memory of the
+// Layout (patient name, MRN). These tests go through the whole App: list -> order -> back. The text boxes wait
+// 300 ms before they change the search, hence the waitFor.
+describe('App: the order list search across pages', () => {
+  const getOrders = vi.mocked(orderService.getOrders)
+  const lastParams = () => getOrders.mock.lastCall?.[0]
+
+  /** Types a patient name into the list and waits until the list has asked for it. */
+  async function searchForPatient(name: string) {
+    await screen.findByText('Jane Doe')
+    await userEvent.type(screen.getByLabelText('Patient name'), name)
+    await waitFor(() => expect(lastParams()).toMatchObject({ patient_name: name }))
+  }
+
+  async function openFirstOrder() {
+    await userEvent.click(await screen.findByRole('link', { name: 'Jane Doe' }))
+    await screen.findByRole('heading', { name: 'Order #7' })
+  }
+
+  it('"Back to orders" returns to the same list and keeps the patient name', async () => {
+    renderApp('/orders')
+    await searchForPatient('Smith')
+    await userEvent.click(within(screen.getByRole('group', { name: 'Status' })).getByRole('button', { name: 'Failed' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ patient_name: 'Smith', status: 'failed' }))
+    await openFirstOrder()
+
+    const back = screen.getByRole('link', { name: '← Back to orders' })
+    expect(back).toHaveAttribute('href', '/orders?status=failed') // the name is not in the link
+    await userEvent.click(back)
+
+    expect(await screen.findByLabelText('Patient name')).toHaveValue('Smith')
+    expect(within(screen.getByRole('group', { name: 'Status' })).getByRole('button', { name: 'Failed' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(lastParams()).toEqual({ page: 1, page_size: 20, status: 'failed', patient_name: 'Smith' }))
+  })
+
+  it('the "Orders" link in the navigation starts a fresh list: the patient name and MRN are cleared', async () => {
+    renderApp('/orders')
+    await searchForPatient('Smith')
+    await userEvent.type(screen.getByLabelText('MRN'), '123456')
+    await waitFor(() => expect(lastParams()).toMatchObject({ patient_name: 'Smith', mrn: '123456' }))
+
+    await userEvent.click(screen.getByRole('link', { name: 'Orders' }))
+
+    await waitFor(() => expect(lastParams()).toEqual({ page: 1, page_size: 20 }))
+    expect(screen.getByLabelText('Patient name')).toHaveValue('')
+    expect(screen.getByLabelText('MRN')).toHaveValue('')
+  })
+
+  it('"Orders" in the navigation from an order also gives a fresh list (URL part and memory part)', async () => {
+    renderApp('/orders')
+    await searchForPatient('Smith')
+    await userEvent.click(within(screen.getByRole('group', { name: 'Status' })).getByRole('button', { name: 'Failed' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ patient_name: 'Smith', status: 'failed' }))
+    await openFirstOrder()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Orders' }))
+
+    expect(await screen.findByLabelText('Patient name')).toHaveValue('')
+    await waitFor(() => expect(lastParams()).toEqual({ page: 1, page_size: 20 }))
+  })
+
+  it('signing out throws the patient name away (the sign-in gate stops rendering the Layout)', async () => {
+    const client = createTestQueryClient()
+    // A new element every time: React skips a render when it gets the very same element again.
+    const tree = () => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/orders']}>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    const view = render(tree())
+    await searchForPatient('Smith')
+
+    signedIn({ authenticated: false, staff: false })
+    view.rerender(tree())
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+
+    signedIn()
+    view.rerender(tree())
+
+    expect(await screen.findByLabelText('Patient name')).toHaveValue('')
+    await waitFor(() => expect(lastParams()).toEqual({ page: 1, page_size: 20 }))
   })
 })
 

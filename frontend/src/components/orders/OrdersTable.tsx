@@ -1,7 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { SortableHeader } from '@/components/orders/SortableHeader'
 import type { OrderListItem, OrderStatus } from '@/types'
 import { describeSort, type OrderSort, type SortColumn } from '@/utils/orderSearch'
+import type { OrderLinkState } from '@/utils/orderSearchUrl'
 import { cn, formatDateTime, getStatusColor } from '@/utils/utils'
 
 /**
@@ -34,6 +35,9 @@ interface OrdersTableProps {
 /** The orders, one row each. Five headers sort the list; "Care Plan" does not (it is derived from the status). */
 export function OrdersTable({ orders, sort, onSort, dimmed }: OrdersTableProps) {
     const navigate = useNavigate()
+    // The order remembers which list it was opened from, so its "Back to orders" link can return to it.
+    const { search } = useLocation()
+    const linkState: OrderLinkState = { ordersSearch: search }
 
     return (
         <>
@@ -62,12 +66,13 @@ export function OrdersTable({ orders, sort, onSort, dimmed }: OrdersTableProps) 
                     {orders.map((order) => (
                         <tr
                             key={order.id}
-                            onClick={() => navigate(`/orders/${order.id}`)}
+                            onClick={() => navigate(`/orders/${order.id}`, { state: linkState })}
                             className="cursor-pointer hover:bg-gray-50"
                         >
                             <td className="px-6 py-4">
                                 <Link
                                     to={`/orders/${order.id}`}
+                                    state={linkState}
                                     onClick={(e) => e.stopPropagation()}
                                     className="text-blue-600 hover:underline"
                                 >
