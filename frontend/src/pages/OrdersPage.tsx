@@ -1,57 +1,21 @@
 import { useAuth } from '@/auth/auth'
 import { downloadFile } from '@/services/download'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Download, FileText, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Download } from 'lucide-react'
 
 import { useOrders } from '@/hooks/useOrders'
-import { formatDateTime, getStatusColor, cn } from '@/utils/utils'
+import { useOrderSearch } from '@/hooks/useOrderSearch'
 import { Button } from '@/components/ui/Button'
-import type { OrderStatus } from '@/types'
+import { OrderFilterPanel } from '@/components/orders/OrderFilterPanel'
+import { OrdersEmptyState, type EmptyKind } from '@/components/orders/OrdersEmptyState'
+import { OrdersPagination } from '@/components/orders/OrdersPagination'
+import { OrdersTable } from '@/components/orders/OrdersTable'
+import { TableSkeleton } from '@/components/orders/TableSkeleton'
+import { describeListError, hasActiveFilters } from '@/utils/orderSearch'
 
-// Number of rows per page. To see pagination controls right away,
-const PAGE_SIZE = 20
-
-const COLUMNS = ['Patient', 'Provider', 'Medication', 'Status', 'Created', 'Care Plan']
-
-/**
- * The backend list endpoint does not include a hasCarePlan field,
- * but status already represents the care plan status
- * because the Java model stores the status on CarePlan.
- * So this column can be derived directly from status.
- */
-function carePlanLabel(status: OrderStatus) {
-    switch (status) {
-        case 'completed':
-            return <span className="text-green-600">✓ Ready</span>
-        case 'processing':
-            return <span className="text-blue-600">Generating…</span>
-        case 'failed':
-            return <span className="text-red-600">Failed</span>
-        default:
-            return <span className="text-gray-400">Pending</span>
-    }
-}
-
-/** Loading skeleton: gray bars with the same structure as the real table, plus a pulse animation */
-function TableSkeleton() {
-    return (
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-            <div className="animate-pulse divide-y divide-gray-200">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex gap-6 px-6 py-4">
-                        <div className="h-4 w-32 rounded bg-gray-200" />
-                        <div className="h-4 w-32 rounded bg-gray-200" />
-                        <div className="h-4 w-40 rounded bg-gray-200" />
-                        <div className="h-4 w-20 rounded bg-gray-200" />
-                        <div className="h-4 w-36 rounded bg-gray-200" />
-                        <div className="h-4 w-20 rounded bg-gray-200" />
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
-}
+/** The query key used while the filters are invalid: nothing is sent for it, so only its shape matters. */
+const NO_PARAMS = {}
 
 export function OrdersPage() {
     const auth = useAuth()
@@ -60,28 +24,39 @@ export function OrdersPage() {
         try { await downloadFile('/export', 'orders.csv') }
         catch (error) { setExportError((error as Error).message || 'Export failed. Please try again.') }
     }
-    // page is local component state. setPage(n) tells React to re-render this component with the new value.
-    const [page, setPage] = useState(1)
 
     // useNavigate gives us a function for navigating in code,
     // equivalent to the user clicking a <Link>.
     const navigate = useNavigate()
 
-    const { data, isLoading, isError, error, isPlaceholderData } = useOrders({
-        page,
-        page_size: PAGE_SIZE,
-    })
+    // Filters, sort and page. `build` is either the request parameters or the fields that are wrong.
+    const orderSearch = useOrderSearch()
+    const { search, build } = orderSearch
+
+    // Invalid filters send nothing: the last good result stays on screen and the fields explain what to fix.
+    const { data, isLoading, isError, error, isPlaceholderData } = useOrders(
+        build.ok ? build.params : NO_PARAMS,
+        build.ok,
+    )
 
     // Values derived from data. Since data may be undefined, use ?? as a fallback.
     const orders = data?.results ?? []
     const totalPages = data ? Math.max(1, Math.ceil(data.count / data.pageSize)) : 1
+    const filtered = hasActiveFilters(search.filters)
+
+    let emptyKind: EmptyKind = 'none'
+    if (data && data.count > 0) emptyKind = 'empty-page'
+    else if (filtered) emptyKind = 'no-match'
 
     return (
         <div>
             {/* Header: title + action buttons, shown in every state */}
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Orders</h1>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
+                    {auth.pharmacist && filtered && (
+                        <p className="text-xs text-gray-500">Export includes all orders, not only the filtered ones.</p>
+                    )}
                     {auth.pharmacist && <Button
                         variant="outline"
                         onClick={() => { void exportCsv() }}
@@ -93,117 +68,52 @@ export function OrdersPage() {
                 </div>
             </div>
 
+            <OrderFilterPanel
+                filters={orderSearch.liveFilters}
+                errors={orderSearch.errors}
+                onTextChange={orderSearch.setDraft}
+                onStatusChange={orderSearch.setStatus}
+                onDateChange={orderSearch.setDate}
+                onClear={orderSearch.clear}
+            />
+
             {exportError && <p role="alert" className="text-red-600">{exportError}</p>}
+            {!build.ok && (
+                <p className="mb-3 text-sm text-amber-700">Fix the highlighted filters to update the results.</p>
+            )}
+
             {/* Four states: read this from top to bottom as if / else-if / else */}
             {isLoading ? (
                 // 1. First load, with no data available yet
                 <TableSkeleton />
             ) : isError ? (
                 // 2. Request failed
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                    <p className="text-red-700">
-                        Error loading orders: {error?.message}
-                    </p>
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <p className="text-red-700">{describeListError(error)}</p>
                 </div>
-            ) : orders.length === 0 ? (
-                // 3. Request succeeded, but there are no records
-                <div className="rounded-lg bg-white p-8 text-center shadow">
-                    <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                    <p className="mb-4 text-gray-500">No orders yet</p>
-                    <Link to="/" className="text-blue-600 hover:underline">
-                        Create your first order
-                    </Link>
-                </div>
+            ) : !data ? null : orders.length === 0 ? (
+                // 3. Request succeeded, but there are no records (or none on this page)
+                <OrdersEmptyState
+                    kind={emptyKind}
+                    onClearFilters={orderSearch.clear}
+                    onFirstPage={() => orderSearch.setPage(1)}
+                />
             ) : (
                 // 4. Normal state: data is available
                 <>
-                    <div
-                        className={cn(
-                            'overflow-hidden rounded-lg bg-white shadow transition-opacity',
-                            isPlaceholderData && 'opacity-50', // Loading another page: make the table semi-transparent
-                        )}
-                    >
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                            <tr>
-                                {COLUMNS.map((h) => (
-                                    <th
-                                        key={h}
-                                        className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                                    >
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                            {orders.map((order) => (
-                                <tr
-                                    key={order.id}
-                                    onClick={() => navigate(`/orders/${order.id}`)}
-                                    className="cursor-pointer hover:bg-gray-50"
-                                >
-                                    <td className="px-6 py-4">
-                                        <Link
-                                            to={`/orders/${order.id}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="text-blue-600 hover:underline"
-                                        >
-                                            {order.patientName}
-                                        </Link>
-                                        <p className="text-sm text-gray-500">MRN: {order.patientMrn}</p>
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-400">{order.providerName}</td>
-                                    <td className="px-6 py-4">{order.medicationName}</td>
-                                    <td className="px-6 py-4">
-                      <span
-                          className={cn(
-                              'rounded-full px-2 py-1 text-xs font-medium',
-                              getStatusColor(order.status),
-                          )}
-                      >
-                        {order.status}
-                      </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
-                                        {formatDateTime(order.createdAt)}
-                                    </td>
-                                    <td className="px-6 py-4">{carePlanLabel(order.status)}</td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination controls: do not render this block when there is only one page */}
-                    {totalPages > 1 && (
-                        <div className="mt-4 flex items-center justify-between">
-                            <p className="text-sm text-gray-500">
-                                Page {page} of {totalPages} · {data?.count} orders
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((p) => p - 1)}
-                                >
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage((p) => p + 1)}
-                                >
-                                    Next
-                                </Button>
-                                {isPlaceholderData && (
-                                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <OrdersTable
+                        orders={orders}
+                        sort={search.sort}
+                        onSort={orderSearch.toggleSort}
+                        dimmed={isPlaceholderData}
+                    />
+                    <OrdersPagination
+                        page={search.page}
+                        totalPages={totalPages}
+                        count={data.count}
+                        loading={isPlaceholderData}
+                        onPageChange={orderSearch.setPage}
+                    />
                 </>
             )}
         </div>

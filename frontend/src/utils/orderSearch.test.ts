@@ -4,6 +4,7 @@ import {
   activeFilterCount,
   clearFilters,
   describeListError,
+  describeSort,
   EARLIEST_DATE,
   EMPTY_FILTERS,
   hasActiveFilters,
@@ -13,8 +14,11 @@ import {
   MAX_TEXT_LENGTH,
   nextSort,
   PAGE_SIZE,
+  resultsLabel,
+  SORT_COLUMN_LABELS,
   SORT_COLUMNS,
   sortToParam,
+  STATUS_FILTER_LABELS,
   STATUS_FILTERS,
   toRequestParams,
   validateFilters,
@@ -43,6 +47,28 @@ describe('constants', () => {
   it('starts with no filter, the default order and page 1', () => {
     expect(INITIAL_SEARCH).toEqual({ filters: EMPTY_FILTERS, sort: null, page: 1 })
     expect(EMPTY_FILTERS.status).toBe('all')
+  })
+})
+
+describe('words shown to the user', () => {
+  it('has a label for every status button and every sortable column', () => {
+    expect(STATUS_FILTERS.map((status) => STATUS_FILTER_LABELS[status]))
+      .toEqual(['All', 'Completed', 'Pending', 'Processing', 'Failed'])
+    expect(SORT_COLUMNS.map((column) => SORT_COLUMN_LABELS[column]))
+      .toEqual(['Patient', 'Provider', 'Medication', 'Status', 'Created'])
+  })
+
+  it('describeSort says how the list is ordered, in words', () => {
+    expect(describeSort(null)).toBe('Sorted by: newest first (default)')
+    expect(describeSort({ column: 'patient_name', direction: 'asc' })).toBe('Sorted by: Patient (ascending)')
+    expect(describeSort({ column: 'created_at', direction: 'desc' })).toBe('Sorted by: Created (descending)')
+  })
+
+  it('resultsLabel uses the singular for exactly one', () => {
+    expect(resultsLabel(0)).toBe('0 results')
+    expect(resultsLabel(1)).toBe('1 result')
+    expect(resultsLabel(2)).toBe('2 results')
+    expect(resultsLabel(45)).toBe('45 results')
   })
 })
 

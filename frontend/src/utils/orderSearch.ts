@@ -59,6 +59,36 @@ export const EMPTY_FILTERS: OrderFilters = {
 
 export const INITIAL_SEARCH: OrderSearchState = { filters: EMPTY_FILTERS, sort: null, page: 1 }
 
+// ---- words shown to the user ---------------------------------------------------------------------
+
+export const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+    all: 'All',
+    completed: 'Completed',
+    pending: 'Pending',
+    processing: 'Processing',
+    failed: 'Failed',
+}
+
+export const SORT_COLUMN_LABELS: Record<SortColumn, string> = {
+    patient_name: 'Patient',
+    provider_name: 'Provider',
+    medication: 'Medication',
+    status: 'Status',
+    created_at: 'Created',
+}
+
+/** The line above the table that says in words how the list is ordered (a screen reader hears it too). */
+export function describeSort(sort: OrderSort | null): string {
+    if (sort === null) return 'Sorted by: newest first (default)'
+    const direction = sort.direction === 'asc' ? 'ascending' : 'descending'
+    return `Sorted by: ${SORT_COLUMN_LABELS[sort.column]} (${direction})`
+}
+
+/** "1 result" / "45 results" */
+export function resultsLabel(count: number): string {
+    return `${count} ${count === 1 ? 'result' : 'results'}`
+}
+
 // ---- changes: every change to the filters or the sort goes back to page 1 -------------------------
 
 /** Changes some filters. The page goes back to 1: page 3 of the old results means nothing for the new ones. */
