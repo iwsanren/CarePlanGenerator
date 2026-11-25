@@ -69,6 +69,51 @@ services:
       timeout: 5s
       retries: 5
 
+  # Single-node Kafka in KRaft mode (one process is both broker and controller; no ZooKeeper). Local development
+  # only: no authentication, one replica. The backend uses it only with CAREPLAN_QUEUE_TYPE=kafka.
+  kafka:
+    image: apache/kafka:4.1.1
+    container_name: careplan-kafka
+    # The name the broker advertises to other containers; it must resolve to this container.
+    hostname: kafka
+    environment:
+      # As soon as one KAFKA_ setting is given, the image expects the whole broker configuration here.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Two client addresses: containers connect to kafka:9092, tools on this computer to localhost:29092.
+      # 9093 is only for the controller and is not published.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Data goes to the volume (the image's own example writes to /tmp and loses everything with the container).
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Topics are created by the application with the intended partition count, never as a side effect of a client.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # Internal topics default to 3 replicas, which one broker cannot satisfy.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Keep the JVM small enough for a laptop.
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports:
+      # Bound to this computer only: the listener has no authentication.
+      - "127.0.0.1:29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      # The check tool is a JVM of its own; without its own limit it would inherit the broker's heap size.
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx128m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
   backend:
     build:
       context: ./backend
@@ -80,6 +125,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     env_file:
       - path: ./backend/.env
@@ -95,6 +142,10 @@ services:
       CAREPLAN_ALLOWED_ORIGINS: ${CAREPLAN_ALLOWED_ORIGINS:-http://localhost:3000}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      # redis (default) or kafka. Set it in the shell that runs docker compose (or in a .env file next to this
+      # file); the value here takes precedence over one in backend/.env. kafka mode does not generate care plans yet.
+      CAREPLAN_QUEUE_TYPE: ${CAREPLAN_QUEUE_TYPE:-redis}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Local demo only: serve /v3/api-docs and /swagger-ui/index.html (off by default in the app)
       SPRINGDOC_API_DOCS_ENABLED: ${SPRINGDOC_API_DOCS_ENABLED:-true}
       SPRINGDOC_SWAGGER_UI_ENABLED: ${SPRINGDOC_SWAGGER_UI_ENABLED:-true}
@@ -131,3 +182,4 @@ services:
 volumes:
   keycloak_data:
   postgres_data:
+  kafka_data:

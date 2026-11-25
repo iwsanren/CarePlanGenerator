@@ -2,6 +2,7 @@ package com.page24.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @Profile("!lambda")
+@ConditionalOnProperty(name = "careplan.queue.type", havingValue = "redis", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class QueueService implements CarePlanQueue {
