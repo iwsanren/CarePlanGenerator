@@ -1,5 +1,9 @@
 package com.page24.backend.aws.lambda;
 
+import com.page24.backend.outbox.OutboxCleanup;
+import com.page24.backend.outbox.OutboxRelay;
+import com.page24.backend.outbox.OutboxRepository;
+import com.page24.backend.outbox.OutboxWakeUpListener;
 import com.page24.backend.service.KafkaCarePlanQueue;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.AfterEach;
@@ -64,5 +68,9 @@ class LambdaKafkaExclusionTest {
         assertThat(context.getBeanNamesForType(NewTopic.class)).isEmpty();
         assertThat(context.getBeanNamesForType(KafkaTemplate.class)).isEmpty();
         assertThat(context.getBeanNamesForType(KafkaAdmin.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxRepository.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxRelay.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxWakeUpListener.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxCleanup.class)).isEmpty();
     }
 }

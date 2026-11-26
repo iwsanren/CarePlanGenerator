@@ -55,7 +55,7 @@ class CarePlanTimingColumnsPostgresTest {
         assertThat(jdbcTemplate.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true AND version IS NOT NULL ORDER BY installed_rank",
                 String.class))
-                .containsExactly("1", "2", "3");
+                .containsExactly("1", "2", "3", "4");
 
         List<String> columns = jdbcTemplate.queryForList("""
                 SELECT column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, 'null')

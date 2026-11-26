@@ -1,5 +1,9 @@
 package com.page24.backend.config;
 
+import com.page24.backend.outbox.OutboxCleanup;
+import com.page24.backend.outbox.OutboxRelay;
+import com.page24.backend.outbox.OutboxRepository;
+import com.page24.backend.outbox.OutboxWakeUpListener;
 import com.page24.backend.service.CarePlanWorker;
 import com.page24.backend.service.KafkaCarePlanQueue;
 import com.page24.backend.service.QueueService;
@@ -13,6 +17,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.support.ProducerListener;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -48,5 +53,12 @@ class QueueTypeRedisDefaultTest {
         assertThat(context.getBeanNamesForType(KafkaAdmin.class)).isEmpty();
         assertThat(context.getBeanNamesForType(ProducerFactory.class)).isEmpty();
         assertThat(context.getBeanNamesForType(ConsumerFactory.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(ProducerListener.class)).isEmpty();
+
+        // nothing of the outbox either: no sender polling the table, no wake-up listener, no clean-up job
+        assertThat(context.getBeanNamesForType(OutboxRepository.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxRelay.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxWakeUpListener.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OutboxCleanup.class)).isEmpty();
     }
 }
