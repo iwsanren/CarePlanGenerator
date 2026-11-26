@@ -5,6 +5,14 @@ import com.page24.backend.outbox.OutboxRelay;
 import com.page24.backend.outbox.OutboxRepository;
 import com.page24.backend.outbox.OutboxWakeUpListener;
 import com.page24.backend.service.KafkaCarePlanQueue;
+import com.page24.backend.service.CarePlanKafkaConsumer;
+import com.page24.backend.service.CarePlanProcessor;
+import com.page24.backend.service.CarePlanLlmCaller;
+import com.page24.backend.service.CarePlanEventParser;
+import com.page24.backend.service.CarePlanClaimRepository;
+import com.page24.backend.service.CarePlanDeadLetterRecoverer;
+import com.page24.backend.service.CarePlanSweeper;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,5 +80,15 @@ class LambdaKafkaExclusionTest {
         assertThat(context.getBeanNamesForType(OutboxRelay.class)).isEmpty();
         assertThat(context.getBeanNamesForType(OutboxWakeUpListener.class)).isEmpty();
         assertThat(context.getBeanNamesForType(OutboxCleanup.class)).isEmpty();
+
+        // and nothing of the consuming side
+        assertThat(context.getBeanNamesForType(CarePlanKafkaConsumer.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanProcessor.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanLlmCaller.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanEventParser.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanClaimRepository.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanDeadLetterRecoverer.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(CarePlanSweeper.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(DefaultErrorHandler.class)).isEmpty();
     }
 }

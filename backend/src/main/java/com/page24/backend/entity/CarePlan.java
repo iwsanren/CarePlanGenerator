@@ -14,6 +14,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "care_plans")
@@ -72,6 +73,28 @@ public class CarePlan {
      */
     @Column(name = "attempt_count")
     private Integer attemptCount;
+
+    /*
+     * Claim columns of the Kafka consumer. updatable = false: Hibernate leaves them out of every entity UPDATE, so a
+     * whole-entity save (regenerate, upload) can never write back an old value over a newer claim. They are only
+     * changed by the conditional statements of CarePlanClaimRepository.
+     */
+
+    /** Goes up by one on every claim; a generation result is only accepted with the current number. */
+    @Column(name = "claim_token", nullable = false, updatable = false, columnDefinition = "integer default 0")
+    private int claimToken = 0;
+
+    /** The eventId of the message that made the latest claim. */
+    @Column(name = "claimed_event_id", updatable = false)
+    private UUID claimedEventId;
+
+    /** Until when the latest claim holds, by the database clock; NULL when nothing is in flight. */
+    @Column(name = "lease_expires_at", updatable = false)
+    private LocalDateTime leaseExpiresAt;
+
+    /** How often the current generation request was taken over from an earlier claim. */
+    @Column(name = "reclaim_count", nullable = false, updatable = false, columnDefinition = "integer default 0")
+    private int reclaimCount = 0;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

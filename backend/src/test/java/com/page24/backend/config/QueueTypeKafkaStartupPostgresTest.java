@@ -7,6 +7,8 @@ import com.page24.backend.outbox.OutboxCleanup;
 import com.page24.backend.outbox.OutboxRelay;
 import com.page24.backend.outbox.OutboxWakeUpListener;
 import com.page24.backend.repository.CarePlanRepository;
+import com.page24.backend.service.CarePlanKafkaConsumer;
+import com.page24.backend.service.CarePlanSweeper;
 import com.page24.backend.service.CarePlanQueue;
 import com.page24.backend.service.CarePlanWorker;
 import com.page24.backend.service.KafkaCarePlanQueue;
@@ -33,12 +35,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /**
  * The whole application in kafka mode against a real broker and a real PostgreSQL (Flyway creates the outbox),
@@ -107,12 +111,14 @@ class QueueTypeKafkaStartupPostgresTest {
     }
 
     @Test
-    @DisplayName("kafka mode replaces the Redis queue and worker with the outbox queue and its sender")
+    @DisplayName("kafka mode replaces the Redis queue and worker with the outbox queue, its sender and consumer")
     void usesTheOutboxInsteadOfTheRedisQueueAndWorker() {
         assertThat(context.getBean(CarePlanQueue.class)).isInstanceOf(KafkaCarePlanQueue.class);
         assertThat(context.getBeanNamesForType(OutboxRelay.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(OutboxWakeUpListener.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(OutboxCleanup.class)).hasSize(1);
+        assertThat(context.getBeanNamesForType(CarePlanKafkaConsumer.class)).hasSize(1);
+        assertThat(context.getBeanNamesForType(CarePlanSweeper.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(QueueService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(CarePlanWorker.class)).isEmpty();
     }
@@ -129,8 +135,8 @@ class QueueTypeKafkaStartupPostgresTest {
 
     @Test
     @WithMockUser(roles = "ASSISTANT")
-    @DisplayName("kafka mode: an order is written to the outbox and its care plan stays PENDING, nothing consumes yet")
-    void orderIsQueuedInTheOutboxButNotProcessed() {
+    @DisplayName("kafka mode: an order is written to the outbox and its care plan gets generated")
+    void orderIsQueuedInTheOutboxAndGenerated() {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setPatientFirstName("Kafka");
         request.setPatientLastName("Startup");
@@ -144,9 +150,10 @@ class QueueTypeKafkaStartupPostgresTest {
         OrderResponse order = orderService.createOrder(request);
 
         CarePlan carePlan = carePlanRepository.findByOrderId(order.getId()).orElseThrow();
-        assertThat(carePlan.getStatus()).isEqualTo(CarePlan.Status.PENDING);
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM outbox_event WHERE aggregate_id = ?", Integer.class, carePlan.getId()))
                 .isEqualTo(1);
+        await().atMost(Duration.ofSeconds(60)).until(() -> carePlanRepository.findById(carePlan.getId())
+                .orElseThrow().getStatus() == CarePlan.Status.COMPLETED);
     }
 }

@@ -20,9 +20,7 @@ import java.util.UUID;
 /**
  * The Kafka queue (careplan.queue.type=kafka). It does not talk to Kafka: it writes the message into the outbox in
  * the caller's transaction, so the message exists exactly when the care plan does. OutboxRelay sends it after the
- * commit.
- *
- * <b>This mode only sends.</b> There is no Kafka consumer yet, so care plans created now stay PENDING.
+ * commit, and CarePlanKafkaConsumer generates the plan.
  */
 @Service
 @Profile("!lambda")
@@ -46,9 +44,8 @@ public class KafkaCarePlanQueue implements CarePlanQueue {
     }
 
     @PostConstruct
-    void warnThatNothingConsumesYet() {
-        log.warn("careplan.queue.type=kafka only SENDS for now: there is no consumer yet, so care plans created now "
-                + "stay PENDING until it exists. Use careplan.queue.type=redis for normal use.");
+    void announceTheQueueInUse() {
+        log.info("careplan.queue.type=kafka: care plans are queued through the outbox to topic {}", topic);
     }
 
     /** MANDATORY: without the caller's transaction the row could be committed although the care plan is not. */

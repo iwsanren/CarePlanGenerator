@@ -66,11 +66,11 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: V1 to V4 ran and all are recorded as successful
+        // Then: V1 to V5 ran and all are recorded as successful
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(4);
+        assertThat(result.migrationsExecuted).isEqualTo(5);
         assertThat(query("SELECT version || ':' || success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
-                .containsExactly("1:true", "2:true", "3:true", "4:true");
+                .containsExactly("1:true", "2:true", "3:true", "4:true", "5:true");
 
         // audit_events has the expected columns, types and nullability
         assertThat(query("""
@@ -113,9 +113,9 @@ class FlywayMigrationPostgresTest {
         // pre-existing rows get the column default
         assertThat(query("SELECT created_by_subject || '/' || updated_by_subject FROM orders"))
                 .containsExactly("legacy/legacy", "legacy/legacy");
-        // history: the baseline marker (0) for the adopted schema, then V1 to V4 applied on top of it
+        // history: the baseline marker (0) for the adopted schema, then V1 to V5 applied on top of it
         assertThat(query("SELECT version FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"))
-                .containsExactly("0", "1", "2", "3", "4");
+                .containsExactly("0", "1", "2", "3", "4", "5");
         assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
     }
 
@@ -168,10 +168,10 @@ class FlywayMigrationPostgresTest {
         execute("CREATE TABLE care_plans (id BIGSERIAL PRIMARY KEY, status VARCHAR(255) NOT NULL, attempt_count INTEGER)",
                 "INSERT INTO care_plans (status, attempt_count) VALUES ('COMPLETED', 3)");
 
-        // When / Then: IF NOT EXISTS keeps the existing column and its data, and adds the missing two (V3, then V4)
+        // When / Then: IF NOT EXISTS keeps the existing column and its data, and adds the missing two (V3, then V4 and V5)
         MigrateResult result = flyway().migrate();
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(2);
+        assertThat(result.migrationsExecuted).isEqualTo(3);
         assertThat(timingColumns("care_plans")).containsExactlyElementsOf(TIMING_COLUMNS);
         assertThat(query("SELECT attempt_count::text FROM care_plans")).containsExactly("3");
     }
@@ -203,9 +203,9 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: V2 to V4 ran (V3 is a no-op here: there is no care_plans table), V1 data is untouched
+        // Then: V2 to V5 ran (V3 is a no-op here: there is no care_plans table), V1 data is untouched
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(3);
+        assertThat(result.migrationsExecuted).isEqualTo(4);
         assertThat(batchTables()).containsExactlyElementsOf(EXPECTED_BATCH_TABLES);
         assertThat(query("SELECT actor_subject FROM audit_events")).containsExactly("user-1");
     }
@@ -301,12 +301,39 @@ class FlywayMigrationPostgresTest {
         // When
         MigrateResult result = flyway().migrate();
 
-        // Then: only V4 ran, the outbox is there and empty (nothing is back-filled), existing rows are untouched
+        // Then: V4 and V5 ran, the outbox is there and empty (nothing is back-filled), existing rows keep their data
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(1);
+        assertThat(result.migrationsExecuted).isEqualTo(2);
         assertThat(query("SELECT count(*)::text FROM outbox_event")).containsExactly("0");
         assertThat(query("SELECT status FROM care_plans ORDER BY id")).containsExactly("PENDING", "COMPLETED");
         assertThat(query("SELECT actor_subject FROM audit_events")).containsExactly("user-1");
+    }
+
+    @Test
+    @DisplayName("V5 on a database with care plans adds the claim columns; existing rows get 0 and NULL")
+    void v5AddsClaimColumnsToExistingCarePlans() throws SQLException {
+        flyway(configure -> configure.target("4")).migrate();
+        execute("CREATE TABLE care_plans (id BIGSERIAL PRIMARY KEY, status VARCHAR(255) NOT NULL)",
+                "INSERT INTO care_plans (status) VALUES ('PENDING'), ('PROCESSING'), ('COMPLETED')");
+
+        MigrateResult result = flyway().migrate();
+
+        assertThat(result.success).isTrue();
+        assertThat(result.migrationsExecuted).isEqualTo(1);
+        assertThat(query("""
+                SELECT column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, 'null')
+                FROM information_schema.columns
+                WHERE table_name = 'care_plans' AND column_name <> 'id' AND column_name <> 'status'
+                ORDER BY column_name"""))
+                .containsExactly(
+                        "claim_token integer NO 0",
+                        "claimed_event_id uuid YES null",
+                        "lease_expires_at timestamp without time zone YES null",
+                        "reclaim_count integer NO 0");
+        assertThat(query("""
+                SELECT claim_token || ':' || reclaim_count || ':' || (claimed_event_id IS NULL)
+                       || ':' || (lease_expires_at IS NULL) FROM care_plans ORDER BY id"""))
+                .containsExactly("0:0:true:true", "0:0:true:true", "0:0:true:true");
     }
 
     private Flyway flyway() {
