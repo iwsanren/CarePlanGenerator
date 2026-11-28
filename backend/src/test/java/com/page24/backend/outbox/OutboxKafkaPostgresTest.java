@@ -181,6 +181,9 @@ class OutboxKafkaPostgresTest {
         // give any late duplicate the chance to appear: the producer has given up on every earlier attempt by now
         await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(30))
                 .until(() -> carePlanIds.stream().allMatch(id -> recordsWithKey(id).size() == 1));
+        // the consumer reconnects to the restarted broker by itself and generates both plans
+        await().atMost(Duration.ofSeconds(120)).until(() -> carePlanIds.stream().allMatch(id ->
+                carePlanRepository.findById(id).orElseThrow().getStatus() == CarePlan.Status.COMPLETED));
     }
 
     private static CreateOrderRequest newOrder() {

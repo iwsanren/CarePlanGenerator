@@ -59,8 +59,9 @@ import static org.mockito.Mockito.verify;
 
 /**
  * The whole application in kafka mode (order, outbox, Kafka, consumer, local mock LLM) against a real PostgreSQL and
- * a real Kafka. One consumer thread, so that "an order waiting behind another" can be arranged. More failure
- * scenarios belong to CP-C6. Needs Docker; skipped without it (CI fails if a *PostgresTest is skipped).
+ * a real Kafka. One consumer thread, so that "an order waiting behind another" can be arranged. The other failure
+ * scenarios are in {@link CarePlanScenarioPostgresTest}. Needs Docker; skipped without it (CI fails if a
+ * *PostgresTest is skipped).
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {

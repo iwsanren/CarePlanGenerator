@@ -47,8 +47,9 @@ import static org.awaitility.Awaitility.await;
  * after the pop leaves the care plan stuck for good.
  *
  * <b>These tests document an existing defect.</b> They are green because they assert the defect is there.
- * After the move to Kafka, CP-C6 replaces them with the opposite tests (a task whose consumer dies is delivered
- * again and the plan reaches COMPLETED).
+ * They stay for as long as the Redis queue does: it is still the default and the path to fall back to. The
+ * opposite for the Kafka queue (a consumer that dies gets its message again and the plan reaches COMPLETED) is
+ * proven in {@link CarePlanScenarioPostgresTest}.
  *
  * <h2>How "the process dies" is simulated, and why that is enough</h2>
  * The defect is the state left behind in the two external stores (Redis and PostgreSQL), not the way a JVM

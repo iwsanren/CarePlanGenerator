@@ -58,8 +58,9 @@ import static org.awaitility.Awaitility.await;
  * Redis if the transaction rolls back).
  *
  * <b>These tests document the existing behaviour.</b> They are green because they assert what happens today.
- * After the move to Kafka, CP-C6 replaces them with the opposite tests (a message is only sent once the row is
- * committed, and a rolled-back order sends nothing).
+ * They stay for as long as the Redis queue does: it is still the default and the path to fall back to. The
+ * opposites for the Kafka queue are in {@link CarePlanScenarioPostgresTest} (no message before the commit,
+ * regenerate through Kafka) and in OutboxKafkaPostgresTest (a rolled-back order leaves nothing to send).
  *
  * <h2>What these tests found (read together)</h2>
  * <ul>
