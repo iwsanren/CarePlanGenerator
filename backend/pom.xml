@@ -104,6 +104,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!-- Kafka (spring-kafka and its auto-configuration; versions from the Spring Boot BOM). Only active when
+             careplan.queue.type=kafka, see KafkaAutoConfigurationFilter. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
         <!-- Spring Retry: automatic retries on failure, analogous to Celery's autoretry_for and retry_backoff -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
@@ -144,6 +150,11 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
